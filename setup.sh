@@ -33,48 +33,57 @@ if ! command -v go &> /dev/null; then
 fi
 echo "Go installed successfully."
 
-# Step 2: Check for ffmpeg installation
-echo "Checking for ffmpeg installation..."
+# Step 2: Check for FFmpeg installation
+echo "Checking for FFmpeg installation..."
 if ! command -v ffmpeg &> /dev/null; then
-    echo "ffmpeg is not installed. Installing ffmpeg..."
-
+    echo "FFmpeg is not installed. Installing FFmpeg..."
     if [[ "$(uname)" == "Darwin" ]]; then
-        # macOS
+        # macOS (requires Homebrew)
         if ! command -v brew &> /dev/null; then
-            echo "Homebrew is not installed. Installing Homebrew..."
+            echo "Homebrew not found. Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            eval "$(/opt/homebrew/bin/brew shellenv)"
         fi
         brew install ffmpeg
     elif [[ "$(uname)" == "Linux" ]]; then
         # Linux
-        sudo apt update
-        sudo apt install -y ffmpeg
+        sudo apt update && sudo apt install -y ffmpeg
     else
-        echo "Unsupported operating system. Please install ffmpeg manually."
+        echo "Unsupported operating system. Please install FFmpeg manually."
         exit 1
     fi
 fi
 
-# Verify ffmpeg installation
+# Verify FFmpeg installation
 if ! command -v ffmpeg &> /dev/null; then
-    echo "Failed to install ffmpeg. Please install it manually and try again."
+    echo "Failed to install FFmpeg. Please install it manually and try again."
     exit 1
 fi
-echo "ffmpeg installed successfully."
+echo "FFmpeg installed successfully."
 
 # Step 3: Build the GrooveSync binary
 echo "Building GrooveSync binary..."
 GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
+if [[ $? -ne 0 ]]; then
+    echo "Error: Failed to build GrooveSync binary."
+    exit 1
+fi
 
-# Step 4: Create the .app bundle
+# Step 4: Create the .app bundle structure
 echo "Creating .app bundle..."
 mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
 cp GrooveSync GrooveSync.app/Contents/MacOS/
-cp bin/yt-dlp_macos GrooveSync.app/Contents/MacOS/yt-dlp_macos
-cp -R assets/ GrooveSync.app/Contents/Resources/
 
-# Generate Info.plist
+# Step 5: Copy yt-dlp binary into the app bundle
+echo "Copying yt-dlp binary..."
+YT_DLP_BINARY="bin/yt-dlp_macos"
+if [[ ! -f $YT_DLP_BINARY ]]; then
+    echo "Error: yt-dlp_macos binary not found in bin/. Please ensure it exists."
+    exit 1
+fi
+cp $YT_DLP_BINARY GrooveSync.app/Contents/MacOS/
+
+# Step 6: Generate Info.plist
+echo "Generating Info.plist..."
 cat > GrooveSync.app/Contents/Info.plist <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -96,13 +105,19 @@ cat > GrooveSync.app/Contents/Info.plist <<EOL
 </plist>
 EOL
 
-# Step 5: Fix macOS security attributes
+# Step 7: Fix macOS security attributes
 echo "Fixing macOS security settings..."
 xattr -c GrooveSync.app
 chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
 chmod +x GrooveSync.app/Contents/MacOS/yt-dlp_macos
 
-# Step 6: Inform the user
+# Step 8: Verify .app bundle
+if [[ ! -f "GrooveSync.app/Contents/MacOS/GrooveSync" || ! -f "GrooveSync.app/Contents/MacOS/yt-dlp_macos" ]]; then
+    echo "Error: .app bundle creation failed. Please check the script and try again."
+    exit 1
+fi
+
+# Step 9: Inform the user
 echo "Packaging complete!"
 echo "GrooveSync.app is ready to test."
 
