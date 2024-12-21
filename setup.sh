@@ -1,76 +1,27 @@
 #!/bin/bash
 
-# Step 1: Check and install Go if not present
-check_go_installation() {
-    echo "Checking if Go is installed..."
-    if ! command -v go &> /dev/null; then
-        echo "Go is not installed. Installing Go..."
-        
-        # Set the version of Go you want to install
-        GO_VERSION="1.23.0"
+# Step 1: Ensure macOS dependencies (only required for macOS security)
+echo "Ensuring macOS dependencies..."
+if ! command -v xattr &> /dev/null; then
+    echo "Error: xattr is required but not installed. Please ensure macOS developer tools are installed."
+    exit 1
+fi
 
-        # Detect architecture
-        ARCH=$(uname -m)
-        case $ARCH in
-            "x86_64")
-                ARCH="amd64"
-                ;;
-            "arm64")
-                ARCH="arm64"
-                ;;
-            *)
-                echo "Unsupported architecture: $ARCH"
-                exit 1
-                ;;
-        esac
+# Step 2: Prepare the .app bundle (prebuilt binary)
+echo "Creating .app bundle..."
 
-        # Detect OS
-        OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
 
-        # Download Go installer
-        GO_TAR="go${GO_VERSION}.${OS}-${ARCH}.tar.gz"
-        echo "Downloading Go (${GO_TAR})..."
-        curl -LO "https://go.dev/dl/${GO_TAR}"
+# Move the prebuilt binary to the app bundle
+cp GrooveSync GrooveSync.app/Contents/MacOS/
 
-        # Extract Go and move to /usr/local
-        echo "Installing Go..."
-        sudo tar -C /usr/local -xzf "${GO_TAR}"
-        rm "${GO_TAR}"
+# Copy dependencies (yt-dlp binaries and assets)
+echo "Copying dependencies..."
+cp -R bin/ GrooveSync.app/Contents/Resources/
+cp -R assets/ GrooveSync.app/Contents/Resources/
 
-        # Add Go to PATH
-        export PATH=$PATH:/usr/local/go/bin
-        echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bash_profile
-        echo "Go installed successfully."
-    else
-        echo "Go is already installed. Skipping installation."
-    fi
-}
-
-# Step 2: Build the Go binary
-build_binary() {
-    echo "Building GrooveSync binary..."
-    GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
-    if [ $? -ne 0 ]; then
-        echo "Failed to build the binary. Please check your Go installation."
-        exit 1
-    fi
-}
-
-# Step 3: Create the .app bundle structure
-create_app_bundle() {
-    echo "Creating .app bundle..."
-    mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
-
-    # Move the binary to the app bundle
-    mv GrooveSync GrooveSync.app/Contents/MacOS/
-
-    # Copy resources (yt-dlp binaries and assets)
-    echo "Copying dependencies..."
-    cp -R bin/ GrooveSync.app/Contents/Resources/
-    cp -R assets/ GrooveSync.app/Contents/Resources/
-
-    # Generate Info.plist
-    cat > GrooveSync.app/Contents/Info.plist <<EOL
+# Generate Info.plist
+cat > GrooveSync.app/Contents/Info.plist <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -90,19 +41,16 @@ create_app_bundle() {
 </dict>
 </plist>
 EOL
-}
 
-# Step 4: Main script execution
-main() {
-    check_go_installation
-    build_binary
-    create_app_bundle
+# Step 3: Fix macOS security attributes
+echo "Fixing macOS security settings..."
+xattr -c GrooveSync.app
+chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
 
-    echo "Packaging complete!"
-    echo "GrooveSync.app is ready to test."
-    echo "To run the app:"
-    echo "  1. Double-click GrooveSync.app."
-    echo "  2. If macOS blocks the app, go to System Preferences > Security & Privacy and allow it."
-}
+# Step 4: Inform the user
+echo "Packaging complete!"
+echo "GrooveSync.app is ready to test."
 
-main
+echo "To run the app:"
+echo "  1. Double-click GrooveSync.app."
+echo "  2. If macOS blocks the app, go to System Preferences > Security & Privacy and allow it."
