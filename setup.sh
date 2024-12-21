@@ -33,35 +33,18 @@ if ! command -v go &> /dev/null; then
 fi
 echo "Go installed successfully."
 
-# Step 2: Ensure yt-dlp binary is present
-echo "Checking for yt-dlp binary..."
-YTDLP_BIN="bin/yt-dlp_macos"
-
-if [[ ! -f "$YTDLP_BIN" ]]; then
-    echo "yt-dlp binary not found. Downloading..."
-    mkdir -p bin
-    curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$YTDLP_BIN"
-    chmod +x "$YTDLP_BIN"
-fi
-
-# Verify yt-dlp functionality
-if ! "$YTDLP_BIN" --version &> /dev/null; then
-    echo "yt-dlp setup failed. Please check the binary manually."
-    exit 1
-fi
-echo "yt-dlp is installed and functional."
-
-# Step 3: Build the GrooveSync binary
+# Step 2: Build the GrooveSync binary
 echo "Building GrooveSync binary..."
 GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
 
-# Step 4: Create the .app bundle
+# Step 3: Create the .app bundle
 echo "Creating .app bundle..."
 mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
 cp GrooveSync GrooveSync.app/Contents/MacOS/
 
-# Copy yt-dlp into the MacOS folder to ensure it’s available
-cp "$YTDLP_BIN" GrooveSync.app/Contents/MacOS/
+# Move yt-dlp binary to the .app bundle
+echo "Adding yt-dlp binary to app bundle..."
+cp bin/yt-dlp_macos GrooveSync.app/Contents/MacOS/
 
 # Generate Info.plist
 cat > GrooveSync.app/Contents/Info.plist <<EOL
@@ -85,17 +68,16 @@ cat > GrooveSync.app/Contents/Info.plist <<EOL
 </plist>
 EOL
 
-# Step 5: Fix macOS security attributes
+# Step 4: Fix macOS security attributes
 echo "Fixing macOS security settings..."
 xattr -c GrooveSync.app
 chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
 chmod +x GrooveSync.app/Contents/MacOS/yt-dlp_macos
 
-# Step 6: Inform the user
+# Step 5: Inform the user
 echo "Packaging complete!"
 echo "GrooveSync.app is ready to test."
 
 echo "To run the app:"
 echo "  1. Double-click GrooveSync.app."
 echo "  2. If macOS blocks the app, go to System Preferences > Security & Privacy and allow it."
-echo "FYNE_BUNDLE=$(pwd)/GrooveSync.app" > GrooveSync.app/Contents/MacOS/env.sh
