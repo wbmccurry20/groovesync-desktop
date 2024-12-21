@@ -1,42 +1,22 @@
-2024/12/09 23:11:50 logger.go:39: Logger initialized with rotation
-2024/12/09 23:57:17 logger.go:39: Logger initialized with rotation
-2024/12/09 23:57:43 downloader.go:52: Using yt-dlp binary: bin/yt-dlp_macos
-2024/12/09 23:57:43 downloader.go:59: Using playlist directory: /Users/will/Desktop/groovesync/late_night
-2024/12/09 23:58:04 downloader.go:52: Using yt-dlp binary: bin/yt-dlp_macos
-2024/12/09 23:58:04 downloader.go:59: Using playlist directory: /Users/will/Desktop/groovesync/late_night
-2024/12/09 23:58:07 downloader.go:73: Found 39 tracks in playlist late_night
-2024/12/09 23:58:07 downloader.go:91: Downloading track 1/39: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:07 downloader.go:156: Starting download for track: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:07 downloader.go:160: Attempting wav format for track: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:07 downloader.go:91: Downloading track 2/39: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:07 downloader.go:156: Starting download for track: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:07 downloader.go:160: Attempting wav format for track: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:07 downloader.go:91: Downloading track 3/39: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:07 downloader.go:156: Starting download for track: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:07 downloader.go:160: Attempting wav format for track: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:38 downloader.go:73: Found 39 tracks in playlist late_night
-2024/12/09 23:58:38 downloader.go:91: Downloading track 3/39: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:38 downloader.go:156: Starting download for track: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:38 downloader.go:160: Attempting wav format for track: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:38 downloader.go:91: Downloading track 1/39: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:38 downloader.go:156: Starting download for track: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:38 downloader.go:160: Attempting wav format for track: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:38 downloader.go:91: Downloading track 2/39: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:38 downloader.go:156: Starting download for track: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:38 downloader.go:160: Attempting wav format for track: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:48 downloader.go:176: Track downloaded successfully in wav format: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:48 downloader.go:177: Finished attempt for track: https://soundcloud.com/somethinggoodofficial/something-good-rhythm-of-the
-2024/12/09 23:58:48 downloader.go:91: Downloading track 4/39: https://soundcloud.com/nuaspect/nu-aspect-run-deep
-2024/12/09 23:58:48 downloader.go:156: Starting download for track: https://soundcloud.com/nuaspect/nu-aspect-run-deep
-2024/12/09 23:58:48 downloader.go:160: Attempting wav format for track: https://soundcloud.com/nuaspect/nu-aspect-run-deep
-2024/12/09 23:58:48 downloader.go:176: Track downloaded successfully in wav format: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:48 downloader.go:177: Finished attempt for track: https://soundcloud.com/kristian-llov/david-guetta-hypatron-be-my-lover-kristian-llov-radio-edit
-2024/12/09 23:58:48 downloader.go:91: Downloading track 5/39: https://soundcloud.com/tinlicker/children-extended-mix
-2024/12/09 23:58:48 downloader.go:156: Starting download for track: https://soundcloud.com/tinlicker/children-extended-mix
-2024/12/09 23:58:48 downloader.go:160: Attempting wav format for track: https://soundcloud.com/tinlicker/children-extended-mix
-2024/12/09 23:58:49 downloader.go:176: Track downloaded successfully in wav format: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:49 downloader.go:177: Finished attempt for track: https://soundcloud.com/niwr-music-dj-voodoo-fr/you-me-rivo-remix
-2024/12/09 23:58:49 downloader.go:91: Downloading track 6/39: https://api-v2.soundcloud.com/tracks/937080535
-2024/12/09 23:58:49 downloader.go:156: Starting download for track: https://api-v2.soundcloud.com/tracks/937080535
-2024/12/09 23:58:49 downloader.go:160: Attempting wav format for track: https://api-v2.soundcloud.com/tracks/937080535
-2024/12/21 16:13:34 logger.go:39: Logger initialized with rotation
+2024/12/21 16:27:59 logger.go:39: Logger initialized with rotation
+2024/12/21 16:28:30 form.go:34: Start Download button clicked
+2024/12/21 16:28:30 downloader.go:51: Using yt-dlp binary: bin/yt-dlp_macos
+2024/12/21 16:28:30 downloader.go:58: Using playlist directory: /Users/will/Desktop/TEST/testGroovesync
+2024/12/21 16:28:55 downloader.go:72: Found 3 tracks in playlist testGroovesync
+2024/12/21 16:28:55 downloader.go:90: Downloading track 3/3: https://soundcloud.com/johnsummit/john-summit-eat-the-bass
+2024/12/21 16:28:55 downloader.go:90: Downloading track 2/3: https://soundcloud.com/johnsummit/john-summit-of-the-trees-stay-with-me-2
+2024/12/21 16:28:55 downloader.go:155: Starting download for track: https://soundcloud.com/johnsummit/john-summit-of-the-trees-stay-with-me-2
+2024/12/21 16:28:55 downloader.go:155: Starting download for track: https://soundcloud.com/johnsummit/john-summit-eat-the-bass
+2024/12/21 16:28:55 downloader.go:159: Attempting wav format for track: https://soundcloud.com/johnsummit/john-summit-eat-the-bass
+2024/12/21 16:28:55 downloader.go:90: Downloading track 1/3: https://soundcloud.com/johnsummit/john-summit-tears-with-paige-cavell-2
+2024/12/21 16:28:55 downloader.go:155: Starting download for track: https://soundcloud.com/johnsummit/john-summit-tears-with-paige-cavell-2
+2024/12/21 16:28:55 downloader.go:159: Attempting wav format for track: https://soundcloud.com/johnsummit/john-summit-of-the-trees-stay-with-me-2
+2024/12/21 16:28:55 downloader.go:159: Attempting wav format for track: https://soundcloud.com/johnsummit/john-summit-tears-with-paige-cavell-2
+2024/12/21 16:29:29 downloader.go:175: Track downloaded successfully in wav format: https://soundcloud.com/johnsummit/john-summit-eat-the-bass
+2024/12/21 16:29:29 downloader.go:176: Finished attempt for track: https://soundcloud.com/johnsummit/john-summit-eat-the-bass
+2024/12/21 16:29:29 downloader.go:175: Track downloaded successfully in wav format: https://soundcloud.com/johnsummit/john-summit-tears-with-paige-cavell-2
+2024/12/21 16:29:29 downloader.go:176: Finished attempt for track: https://soundcloud.com/johnsummit/john-summit-tears-with-paige-cavell-2
+2024/12/21 16:29:29 downloader.go:175: Track downloaded successfully in wav format: https://soundcloud.com/johnsummit/john-summit-of-the-trees-stay-with-me-2
+2024/12/21 16:29:29 downloader.go:176: Finished attempt for track: https://soundcloud.com/johnsummit/john-summit-of-the-trees-stay-with-me-2
+2024/12/21 16:29:29 downloader.go:115: All tracks for playlist testGroovesync downloaded successfully.
+2024/12/21 16:29:29 form.go:85: Download completed successfully
