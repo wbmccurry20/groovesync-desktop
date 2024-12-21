@@ -13,18 +13,19 @@ import (
 
 // getYTDLPBinaryPath determines the path to the yt-dlp binary based on the OS and architecture.
 func getYTDLPBinaryPath() (string, error) {
-	// Check if running in a macOS .app bundle
-	if bundlePath := os.Getenv("FYNE_BUNDLE"); bundlePath != "" {
-		// Inside the .app bundle: Look in Contents/MacOS
-		binaryPath := filepath.Join(bundlePath, "Contents", "MacOS", "yt-dlp_macos")
+	// Check if running inside the .app bundle
+	execPath, err := os.Executable()
+	if err == nil {
+		bundlePath := filepath.Dir(execPath)
+		binaryPath := filepath.Join(bundlePath, "yt-dlp_macos")
 		if _, err := os.Stat(binaryPath); err == nil {
+			// Binary found inside the .app bundle
 			return binaryPath, nil
 		}
 	}
 
-	// Development mode: Look in the `bin/` directory
+	// Fall back to the `bin/` directory for development mode
 	baseDir := "bin"
-
 	var binaryName string
 	switch runtime.GOOS {
 	case "darwin":
