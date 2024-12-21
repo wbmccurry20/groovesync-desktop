@@ -1,29 +1,34 @@
 #!/bin/bash
 
+echo "Starting GrooveSync setup..."
+
+# Define Go version
+GO_VERSION="1.21.0"
+
 # Step 1: Check for Go installation
 echo "Checking for Go installation..."
 if ! command -v go &> /dev/null; then
     echo "Go is not installed. Installing Go..."
-
-    # Define Go version
-    GO_VERSION="1.21.0"
-
-    # Download and install Go
     if [[ "$(uname)" == "Darwin" ]]; then
-        # macOS
+        # macOS installation
+        echo "Downloading Go ${GO_VERSION} for macOS..."
         curl -OL "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.pkg"
         sudo installer -pkg "go${GO_VERSION}.darwin-arm64.pkg" -target /
         rm "go${GO_VERSION}.darwin-arm64.pkg"
     elif [[ "$(uname)" == "Linux" ]]; then
-        # Linux
+        # Linux installation
+        echo "Downloading Go ${GO_VERSION} for Linux..."
         curl -OL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
         sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
         rm "go${GO_VERSION}.linux-amd64.tar.gz"
         export PATH=$PATH:/usr/local/go/bin
+        echo "Added Go to PATH."
     else
         echo "Unsupported operating system. Please install Go manually."
         exit 1
     fi
+else
+    echo "Go is already installed. Skipping installation..."
 fi
 
 # Verify Go installation
@@ -35,11 +40,17 @@ echo "Go installed successfully."
 
 # Step 2: Build the GrooveSync binary
 echo "Building GrooveSync binary..."
-GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
+if ! GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go; then
+    echo "Error building GrooveSync binary. Please check your Go setup."
+    exit 1
+fi
+echo "GrooveSync binary built successfully."
 
 # Step 3: Create the .app bundle
 echo "Creating .app bundle..."
 mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
+
+# Copy the binary and resources into the app bundle
 cp GrooveSync GrooveSync.app/Contents/MacOS/
 cp -R bin/ GrooveSync.app/Contents/Resources/
 cp -R assets/ GrooveSync.app/Contents/Resources/
@@ -65,16 +76,20 @@ cat > GrooveSync.app/Contents/Info.plist <<EOL
 </dict>
 </plist>
 EOL
+echo "Info.plist generated successfully."
 
 # Step 4: Fix macOS security attributes
 echo "Fixing macOS security settings..."
 xattr -c GrooveSync.app
 chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
 
-# Step 5: Inform the user
+# Step 5: Cleanup build artifacts
+echo "Cleaning up temporary build files..."
+rm -f GrooveSync
+
+# Step 6: Final instructions
 echo "Packaging complete!"
 echo "GrooveSync.app is ready to test."
-
 echo "To run the app:"
 echo "  1. Double-click GrooveSync.app."
 echo "  2. If macOS blocks the app, go to System Preferences > Security & Privacy and allow it."
