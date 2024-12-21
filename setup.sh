@@ -59,8 +59,9 @@ GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
 echo "Creating .app bundle..."
 mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
 cp GrooveSync GrooveSync.app/Contents/MacOS/
-cp -R bin/ GrooveSync.app/Contents/Resources/
-cp -R assets/ GrooveSync.app/Contents/Resources/
+
+# Copy yt-dlp into the MacOS folder to ensure it’s available
+cp "$YTDLP_BIN" GrooveSync.app/Contents/MacOS/
 
 # Generate Info.plist
 cat > GrooveSync.app/Contents/Info.plist <<EOL
@@ -88,6 +89,7 @@ EOL
 echo "Fixing macOS security settings..."
 xattr -c GrooveSync.app
 chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
+chmod +x GrooveSync.app/Contents/MacOS/yt-dlp_macos
 
 # Step 6: Inform the user
 echo "Packaging complete!"
