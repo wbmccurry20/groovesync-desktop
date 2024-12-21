@@ -39,3 +39,4 @@
 2024/12/09 23:58:49 downloader.go:91: Downloading track 6/39: https://api-v2.soundcloud.com/tracks/937080535
 2024/12/09 23:58:49 downloader.go:156: Starting download for track: https://api-v2.soundcloud.com/tracks/937080535
 2024/12/09 23:58:49 downloader.go:160: Attempting wav format for track: https://api-v2.soundcloud.com/tracks/937080535
+2024/12/21 16:13:34 logger.go:39: Logger initialized with rotation

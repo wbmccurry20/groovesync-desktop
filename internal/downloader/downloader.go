@@ -37,7 +37,6 @@ func getYTDLPBinaryPath() (string, error) {
 }
 
 // RunYTDLPParallel downloads tracks from a playlist URL in parallel.
-// It takes callbacks for updating status and progress.
 func RunYTDLPParallel(
 	playlistURL, downloadDir, playlistName, userFormat string,
 	updateStatus func(string),
