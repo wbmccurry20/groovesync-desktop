@@ -13,22 +13,32 @@ import (
 
 // getYTDLPBinaryPath determines the path to the yt-dlp binary based on the OS and architecture.
 func getYTDLPBinaryPath() (string, error) {
-	baseDir := "bin"
+	var binaryPath string
 
-	var binaryName string
-	switch runtime.GOOS {
-	case "darwin":
-		binaryName = "yt-dlp_macos"
-	case "linux":
-		binaryName = "yt-dlp_linux"
-	case "windows":
-		binaryName = "yt-dlp.exe"
-	default:
-		return "", fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	// Check if running in a macOS .app bundle
+	if bundlePath := os.Getenv("FYNE_BUNDLE"); bundlePath != "" {
+		// Inside the .app bundle: Use Contents/MacOS directory
+		binaryPath = filepath.Join(bundlePath, "Contents", "MacOS", "yt-dlp_macos")
+	} else {
+		// Development environment: Use bin/ directory
+		baseDir := "bin"
+
+		var binaryName string
+		switch runtime.GOOS {
+		case "darwin":
+			binaryName = "yt-dlp_macos"
+		case "linux":
+			binaryName = "yt-dlp_linux"
+		case "windows":
+			binaryName = "yt-dlp.exe"
+		default:
+			return "", fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+		}
+
+		binaryPath = filepath.Join(baseDir, binaryName)
 	}
 
-	binaryPath := filepath.Join(baseDir, binaryName)
-
+	// Verify the binary exists
 	if _, err := os.Stat(binaryPath); err != nil {
 		return "", fmt.Errorf("yt-dlp binary not found at %s: %v", binaryPath, err)
 	}

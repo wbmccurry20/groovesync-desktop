@@ -98,3 +98,4 @@ echo "GrooveSync.app is ready to test."
 echo "To run the app:"
 echo "  1. Double-click GrooveSync.app."
 echo "  2. If macOS blocks the app, go to System Preferences > Security & Privacy and allow it."
+echo "FYNE_BUNDLE=$(pwd)/GrooveSync.app" > GrooveSync.app/Contents/MacOS/env.sh
