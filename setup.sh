@@ -33,21 +33,13 @@ if ! command -v go &> /dev/null; then
 fi
 echo "Go installed successfully."
 
-# Step 2: Ensure yt-dlp binary is present and functional
-echo "Verifying yt-dlp installation..."
-YTDLP_BIN="GrooveSync.app/Contents/Resources/bin/yt-dlp_macos"
+# Step 2: Ensure yt-dlp binary is present
+echo "Checking for yt-dlp binary..."
+YTDLP_BIN="bin/yt-dlp_macos"
 
-# Check if yt-dlp binary exists
 if [[ ! -f "$YTDLP_BIN" ]]; then
     echo "yt-dlp binary not found. Downloading..."
-    mkdir -p "$(dirname "$YTDLP_BIN")"
-    curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$YTDLP_BIN"
-    chmod +x "$YTDLP_BIN"
-fi
-
-# Test yt-dlp binary
-if ! "$YTDLP_BIN" --version &> /dev/null; then
-    echo "yt-dlp binary is not functional. Re-downloading..."
+    mkdir -p bin
     curl -L "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$YTDLP_BIN"
     chmod +x "$YTDLP_BIN"
 fi
