@@ -33,18 +33,46 @@ if ! command -v go &> /dev/null; then
 fi
 echo "Go installed successfully."
 
-# Step 2: Build the GrooveSync binary
+# Step 2: Check for ffmpeg installation
+echo "Checking for ffmpeg installation..."
+if ! command -v ffmpeg &> /dev/null; then
+    echo "ffmpeg is not installed. Installing ffmpeg..."
+
+    if [[ "$(uname)" == "Darwin" ]]; then
+        # macOS
+        if ! command -v brew &> /dev/null; then
+            echo "Homebrew is not installed. Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        fi
+        brew install ffmpeg
+    elif [[ "$(uname)" == "Linux" ]]; then
+        # Linux
+        sudo apt update
+        sudo apt install -y ffmpeg
+    else
+        echo "Unsupported operating system. Please install ffmpeg manually."
+        exit 1
+    fi
+fi
+
+# Verify ffmpeg installation
+if ! command -v ffmpeg &> /dev/null; then
+    echo "Failed to install ffmpeg. Please install it manually and try again."
+    exit 1
+fi
+echo "ffmpeg installed successfully."
+
+# Step 3: Build the GrooveSync binary
 echo "Building GrooveSync binary..."
 GOOS=darwin GOARCH=arm64 go build -o GrooveSync ./cmd/main.go
 
-# Step 3: Create the .app bundle
+# Step 4: Create the .app bundle
 echo "Creating .app bundle..."
 mkdir -p GrooveSync.app/Contents/{MacOS,Resources}
 cp GrooveSync GrooveSync.app/Contents/MacOS/
-
-# Move yt-dlp binary to the .app bundle
-echo "Adding yt-dlp binary to app bundle..."
-cp bin/yt-dlp_macos GrooveSync.app/Contents/MacOS/
+cp bin/yt-dlp_macos GrooveSync.app/Contents/MacOS/yt-dlp_macos
+cp -R assets/ GrooveSync.app/Contents/Resources/
 
 # Generate Info.plist
 cat > GrooveSync.app/Contents/Info.plist <<EOL
@@ -68,13 +96,13 @@ cat > GrooveSync.app/Contents/Info.plist <<EOL
 </plist>
 EOL
 
-# Step 4: Fix macOS security attributes
+# Step 5: Fix macOS security attributes
 echo "Fixing macOS security settings..."
 xattr -c GrooveSync.app
 chmod +x GrooveSync.app/Contents/MacOS/GrooveSync
 chmod +x GrooveSync.app/Contents/MacOS/yt-dlp_macos
 
-# Step 5: Inform the user
+# Step 6: Inform the user
 echo "Packaging complete!"
 echo "GrooveSync.app is ready to test."
 
