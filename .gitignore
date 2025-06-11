@@ -1,0 +1,79 @@
+# Build outputs
+build/bin
+build/
+dist/
+*.app
+*.exe
+*.dmg
+*.msi
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Frontend build outputs
+frontend/dist/
+frontend/build/
+
+# Wails generated files (keep the structure but ignore some temp files)
+frontend/wailsjs/wailsjs/
+wailsjs/
+*.wails
+
+# Go build outputs
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Download directories (if you want to ignore the actual downloads)
+downloads/
+output/
+
+# Package files
+*.tgz
+*.tar.gz
