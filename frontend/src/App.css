@@ -1,0 +1,30 @@
+/* App.css */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(55, 65, 81, 0.5); /* gray-700/50 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.5); /* blue-400/50 */
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.8); /* blue-400/80 */
+}
+
+/* Smooth transitions for hover effects */
+button, .hover\:scale-105:hover {
+    transition: transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Ensure the app takes up the full viewport height */
+html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
