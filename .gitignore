@@ -1,4 +1,5 @@
 # Build outputs
+bin/
 build/bin
 build/
 dist/
@@ -6,6 +7,16 @@ dist/
 *.exe
 *.dmg
 *.msi
+
+# Binary executables and tools
+bin/
+ffmpeg
+ffprobe
+yt-dlp
+*.exe
+*.dll
+*.so
+*.dylib
 
 # Dependencies
 node_modules/
@@ -15,17 +26,12 @@ frontend/node_modules/
 frontend/dist/
 frontend/build/
 
-# Wails generated files (keep the structure but ignore some temp files)
+# Wails generated files
 frontend/wailsjs/wailsjs/
 wailsjs/
 *.wails
 
 # Go build outputs
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
 vendor/
 
 # Test binary, built with `go test -c`
