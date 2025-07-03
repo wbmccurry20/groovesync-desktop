@@ -47,11 +47,33 @@ if ! command -v npm &> /dev/null; then
     fi
 fi
 
-echo "Building frontend..."
+echo "Installing frontend dependencies..."
 cd frontend
 if [[ ! -d "node_modules" ]]; then
     npm install
 fi
+# Create dist directory with a temporary file for wails generate
+mkdir -p dist
+echo "/* temporary file for build */" > dist/temp.js
+cd ..
+
+# Clean any existing wailsjs directories to avoid nesting
+echo "Cleaning existing wailsjs directories..."
+rm -rf frontend/wailsjs
+
+# Generate Wails bindings
+echo "Generating Wails bindings..."
+wails generate module
+
+# Fix nested wailsjs structure if it occurs
+if [[ -d "frontend/wailsjs/wailsjs" ]]; then
+    echo "Fixing nested wailsjs structure..."
+    mv frontend/wailsjs/wailsjs/* frontend/wailsjs/
+    rmdir frontend/wailsjs/wailsjs
+fi
+
+echo "Building frontend..."
+cd frontend
 npm run build
 cd ..
 
