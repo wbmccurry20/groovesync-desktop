@@ -16,6 +16,8 @@ if ! command -v go &> /dev/null; then
         curl -OL "https://go.dev/dl/go${GO_VERSION}.darwin-arm64.pkg"
         sudo installer -pkg "go${GO_VERSION}.darwin-arm64.pkg" -target /
         rm "go${GO_VERSION}.darwin-arm64.pkg"
+        # Add Go to PATH
+        export PATH=$PATH:/usr/local/go/bin
     elif [[ "$(uname)" == "Linux" ]]; then
         curl -OL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz"
         sudo tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz"
@@ -27,10 +29,21 @@ if ! command -v go &> /dev/null; then
     fi
 fi
 
+# Ensure Go bin directory is always in PATH
+export PATH=$PATH:$(go env GOPATH)/bin:$HOME/go/bin
+
 echo "Checking for Wails installation..."
 if ! command -v wails &> /dev/null; then
     echo "Wails is not installed. Installing Wails..."
     go install github.com/wailsapp/wails/v2/cmd/wails@v2.10.1
+    # Update PATH again after installation
+    export PATH=$PATH:$(go env GOPATH)/bin:$HOME/go/bin
+    # Verify installation
+    if ! command -v wails &> /dev/null; then
+        echo "Error: Wails installation failed or not in PATH."
+        echo "Please manually add $(go env GOPATH)/bin to your PATH"
+        exit 1
+    fi
 fi
 
 echo "Checking for Node.js and npm installation..."
@@ -193,5 +206,14 @@ chmod +x dist/GrooveSync.app/Contents/MacOS/GrooveSync
 echo "Packaging complete!"
 echo "Artifacts are in the dist/ directory:"
 echo "- macOS: dist/GrooveSync.app"
-echo "To test on macOS, double-click dist/GrooveSync.app."
-echo "Linux and Windows builds skipped due to cross-compilation issues on macOS. Build on a Linux or Windows machine, or set up cross-compilation."
+echo ""
+echo "🚀 TO RUN THE APP:"
+echo "1. Navigate to the 'dist' folder"
+echo "2. Double-click 'GrooveSync.app'"
+echo ""
+echo "⚠️  SECURITY NOTE:"
+echo "If macOS shows a security warning:"
+echo "1. Right-click the app → 'Open' → 'Open' (bypass Gatekeeper)"
+echo "2. Or run: xattr -d com.apple.quarantine dist/GrooveSync.app"
+echo ""
+echo "🔧 ALTERNATIVE: Run from terminal with: open dist/GrooveSync.app"
