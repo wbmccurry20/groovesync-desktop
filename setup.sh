@@ -99,7 +99,7 @@ chmod +x GrooveSync.app/Contents/MacOS/bin/ffmpeg
 chmod +x GrooveSync.app/Contents/MacOS/bin/ffprobe
 # Step 6: Generate Info.plist
 echo "Generating Info.plist..."
-cat > GrooveSync.app/Contents/Info.plist <<EOL
+cat > dist/GrooveSync.app/Contents/Info.plist <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -116,6 +116,12 @@ cat > GrooveSync.app/Contents/Info.plist <<EOL
     <string>APPL</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <false/>
+    <key>LSBackgroundOnly</key>
+    <false/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 </dict>
 </plist>
 EOL
