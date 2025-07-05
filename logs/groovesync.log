@@ -119,3 +119,16 @@
 2025/06/06 01:21:10 downloader.go:295: Track downloaded successfully in wav format: https://soundcloud.com/elesha-kearns-31990541/at-night-purple-disco-machine-extended-remix
 2025/06/06 01:21:10 downloader.go:297: Finished attempt for track: https://soundcloud.com/elesha-kearns-31990541/at-night-purple-disco-machine-extended-remix
 2025/06/06 01:21:10 downloader.go:186: All tracks for playlist testing downloaded successfully.
+2025/07/03 15:13:07 logger.go:41: Logger initialized with rotation
+2025/07/03 15:14:11 logger.go:41: Logger initialized with rotation
+2025/07/03 15:29:32 logger.go:41: Logger initialized with rotation
+2025/07/03 15:29:55 logger.go:41: Logger initialized with rotation
+2025/07/03 15:31:41 logger.go:41: Logger initialized with rotation
+2025/07/03 15:31:47 logger.go:41: Logger initialized with rotation
+2025/07/03 15:32:47 logger.go:41: Logger initialized with rotation
+2025/07/05 13:21:21 logger.go:41: Logger initialized with rotation
+2025/07/05 13:30:43 logger.go:41: Logger initialized with rotation
+2025/07/05 13:31:19 logger.go:41: Logger initialized with rotation
+2025/07/05 13:31:19 main.go:44: Wails applications will not build without the correct build tags.
+2025/07/05 13:32:46 logger.go:41: Logger initialized with rotation
+2025/07/05 13:33:19 logger.go:41: Logger initialized with rotation
