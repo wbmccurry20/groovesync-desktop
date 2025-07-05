@@ -195,6 +195,12 @@ cat > dist/GrooveSync.app/Contents/Info.plist <<EOL
     <string>APPL</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <false/>
+    <key>LSBackgroundOnly</key>
+    <false/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
 </dict>
 </plist>
 EOL
