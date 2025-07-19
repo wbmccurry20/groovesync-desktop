@@ -1,16 +1,15 @@
 package downloader
 
 import (
-	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,18 +46,19 @@ func getBinaryPaths() (ytdlpPath, ffmpegPath string, err error) {
 	execPath, err := os.Executable()
 	if err == nil {
 		execDir := filepath.Dir(execPath)
-		// On macOS, if inside .app bundle, adjust the path to Contents/Resources/
+		// On macOS, adjust for app bundle
 		if runtime.GOOS == "darwin" {
-			execDir = filepath.Join(execDir, "..", "Resources")
+			execDir = filepath.Join(execDir, "..", "Resources", "bin")
+		} else {
+			execDir = filepath.Join(execDir, "bin")
 		}
-		// Try bin/ subdirectory
-		binDir := filepath.Join(execDir, "bin")
-		ytdlpPath = filepath.Join(binDir, ytdlpBinaryName)
-		ffmpegPath = filepath.Join(binDir, ffmpegBinaryName)
+		ytdlpPath = filepath.Join(execDir, ytdlpBinaryName)
+		ffmpegPath = filepath.Join(execDir, ffmpegBinaryName)
 
-		// Check if both binaries exist
+		// Verify binaries exist
 		if _, err := os.Stat(ytdlpPath); err == nil {
 			if _, err := os.Stat(ffmpegPath); err == nil {
+				log.Printf("Using bundled binaries: yt-dlp=%s, ffmpeg=%s", ytdlpPath, ffmpegPath)
 				return ytdlpPath, ffmpegPath, nil
 			}
 		}
@@ -69,12 +69,11 @@ func getBinaryPaths() (ytdlpPath, ffmpegPath string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get working directory: %v", err)
 	}
-
 	binDir := filepath.Join(baseDir, "bin")
 	ytdlpPath = filepath.Join(binDir, ytdlpBinaryName)
 	ffmpegPath = filepath.Join(binDir, ffmpegBinaryName)
 
-	// Check if both binaries exist
+	// Verify binaries exist
 	if _, err := os.Stat(ytdlpPath); err != nil {
 		return "", "", fmt.Errorf("yt-dlp binary not found at %s: %v", ytdlpPath, err)
 	}
@@ -82,6 +81,7 @@ func getBinaryPaths() (ytdlpPath, ffmpegPath string, err error) {
 		return "", "", fmt.Errorf("ffmpeg binary not found at %s: %v", ffmpegPath, err)
 	}
 
+	log.Printf("Using development binaries: yt-dlp=%s, ffmpeg=%s", ytdlpPath, ffmpegPath)
 	return ytdlpPath, ffmpegPath, nil
 }
 
@@ -107,29 +107,33 @@ func RunYTDLPParallel(
 	playlistDir := filepath.Join(downloadDir, playlistName)
 	if err := os.MkdirAll(playlistDir, 0755); err != nil {
 		updateStatus("Error: Failed to create playlist directory")
-		log.Printf("Error creating playlist directory: %v", err)
+		log.Printf("Error creating playlist directory %s: %v", playlistDir, err)
 		return err
 	}
 
 	// Extract track URLs and metadata
+	log.Printf("Attempting to extract tracks from: %s", playlistURL)
 	trackURLs, playlistTitle, tracks, err := extractTrackURLs(ytdlpPath, playlistURL)
 	if err != nil {
-		updateStatus("Error: Failed to extract playlist tracks")
-		log.Printf("Error extracting tracks: %v", err)
+		updateStatus(fmt.Sprintf("Error extracting tracks: %v", err))
+		log.Printf("Extraction failed for %s: %v", playlistURL, err)
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			log.Printf("yt-dlp stderr: %s", string(exitErr.Stderr))
+		}
 		return err
 	}
 	if len(trackURLs) == 0 {
 		updateStatus("No tracks found in playlist")
-		log.Printf("No tracks found for playlist: %s", playlistURL)
+		log.Printf("No tracks extracted from %s", playlistURL)
 		return fmt.Errorf("no tracks found in playlist")
 	}
-	log.Printf("Found %d tracks in playlist %s", len(trackURLs), playlistName)
+	log.Printf("Extracted %d tracks from playlist titled '%s'", len(trackURLs), playlistTitle)
+	updateTracks(tracks)
 
 	// Auto-fill playlist name if not provided
 	if playlistName == "" {
 		playlistName = playlistTitle
 	}
-	updateTracks(tracks)
 	updateStatus("Starting downloads...")
 	updateProgress(0, len(trackURLs))
 
@@ -153,7 +157,7 @@ func RunYTDLPParallel(
 			updateStatus(fmt.Sprintf("Downloading Track %d/%d: %s", trackIdx+1, len(trackURLs), track.Title))
 			log.Printf("Downloading track %d/%d: %s", trackIdx+1, len(trackURLs), track.URL)
 
-			err := downloadTrackWithRetry(ytdlpPath, track.URL, playlistDir, []string{userFormat, "wav", "opus", "mp3"}, func(percent float64) {
+			err := downloadTrack(ytdlpPath, track.URL, playlistDir, userFormat, func(percent float64) {
 				// Update progress as a percentage for the current track
 				overallProgress := (float64(trackIdx) + (percent / 100.0)) / float64(len(trackURLs)) * 100
 				updateProgress(int(overallProgress*float64(len(trackURLs))/100), len(trackURLs))
@@ -187,14 +191,26 @@ func RunYTDLPParallel(
 	return nil
 }
 
-// extractTrackURLs uses yt-dlp to list track URLs and metadata without downloading.
+// extractTrackURLs uses yt-dlp to list track URLs and metadata with a timeout.
 func extractTrackURLs(binary, playlistURL string) ([]string, string, []Track, error) {
-	cmd := exec.Command(binary, "--flat-playlist", "--no-warnings", "-J", playlistURL)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Printf("yt-dlp error: %v\nOutput: %s", err, string(output))
+	log.Printf("Executing yt-dlp for extraction: %s %s", binary, playlistURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second) // Increased to 60 seconds
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binary, "--flat-playlist", "--no-warnings", "-J", "--verbose", "--cookies-from-browser", "firefox", playlistURL)
+	cmd.Env = os.Environ() // Inherit parent environment
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("yt-dlp extraction timed out after 60s: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
+		} else {
+			log.Printf("yt-dlp extract failed: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
+		}
 		return nil, "", nil, err
 	}
+	log.Printf("yt-dlp extraction output: %s", outBuf.String())
 
 	type entry struct {
 		URL   string `json:"url"`
@@ -206,7 +222,8 @@ func extractTrackURLs(binary, playlistURL string) ([]string, string, []Track, er
 	}
 
 	var data playlistData
-	if err := json.Unmarshal(output, &data); err != nil {
+	if err := json.Unmarshal(outBuf.Bytes(), &data); err != nil {
+		log.Printf("JSON unmarshal error: %v\nOutput: %s", err, outBuf.String())
 		return nil, "", nil, err
 	}
 
@@ -218,85 +235,45 @@ func extractTrackURLs(binary, playlistURL string) ([]string, string, []Track, er
 			tracks = append(tracks, Track{URL: e.URL, Title: e.Title})
 		}
 	}
+	log.Printf("Extracted %d tracks", len(tracks))
 	return urls, data.Title, tracks, nil
 }
 
 // downloadTrackWithRetry attempts to download a track with retries.
 func downloadTrackWithRetry(binary, url, playlistDir string, formats []string, progressCb func(float64)) error {
 	operation := func() error {
-		return downloadTrackWithFallback(binary, url, playlistDir, formats, progressCb)
+		return downloadTrack(binary, url, playlistDir, formats[0], progressCb) // Use first format
 	}
 	bo := backoff.NewExponentialBackOff()
 	bo.MaxElapsedTime = 5 * time.Minute
 	return backoff.Retry(operation, bo)
 }
 
-// downloadTrackWithFallback tries each format until one succeeds, with progress tracking.
-func downloadTrackWithFallback(binary, url, playlistDir string, formats []string, progressCb func(float64)) error {
+// downloadTrack handles a single track download with detailed logging.
+func downloadTrack(binary, url, playlistDir, format string, progressCb func(float64)) error {
 	log.Printf("Starting download for track: %s", url)
-	defer log.Printf("Finished attempt for track: %s", url)
-
-	ytdlpPath, ffmpegPath, err := getBinaryPaths()
-	if err != nil {
-		return fmt.Errorf("failed to locate binaries: %v", err)
+	opts := []string{
+		"-x",
+		"--verbose",
+		"--cookies-from-browser", "firefox",
+		"--audio-format", format,
+		"--audio-quality", "0",
+		"-o", filepath.Join(playlistDir, "%(title)s.%(ext)s"),
+		url,
 	}
 
-	// Ensure binaries are executable (non-Windows)
-	if runtime.GOOS != "windows" {
-		if err := os.Chmod(ytdlpPath, 0755); err != nil {
-			return fmt.Errorf("failed to make yt-dlp executable: %v", err)
-		}
-		if err := os.Chmod(ffmpegPath, 0755); err != nil {
-			return fmt.Errorf("failed to make ffmpeg executable: %v", err)
-		}
+	cmd := exec.Command(binary, opts...)
+	cmd.Env = os.Environ() // Inherit parent environment
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		log.Printf("yt-dlp download failed: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
+		return err
 	}
-
-	// Regex to parse yt-dlp progress (e.g., "[download]  50.0% of 10.00MiB")
-	progressRegex := regexp.MustCompile(`\[download\]\s+(\d+\.\d+)%`)
-
-	for _, f := range formats {
-		log.Printf("Attempting %s format for track: %s", f, url)
-		opts := []string{
-			"-x",
-			"--audio-format", f,
-			"--audio-quality", "0",
-			"--ffmpeg-location", filepath.Dir(ffmpegPath),
-			"-o", filepath.Join(playlistDir, "%(title)s.%(ext)s"),
-			url,
-		}
-
-		cmd := exec.Command(ytdlpPath, opts...)
-		stderr, err := cmd.StderrPipe()
-		if err != nil {
-			return fmt.Errorf("failed to pipe stderr: %v", err)
-		}
-
-		if err := cmd.Start(); err != nil {
-			return fmt.Errorf("failed to start yt-dlp: %v", err)
-		}
-
-		// Read stderr to parse progress
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			log.Printf("yt-dlp output: %s", line)
-			if matches := progressRegex.FindStringSubmatch(line); len(matches) > 1 {
-				if percent, err := strconv.ParseFloat(matches[1], 64); err == nil {
-					progressCb(percent)
-				}
-			}
-		}
-
-		if err := cmd.Wait(); err != nil {
-			log.Printf("Failed %s for track %s: %v", f, url, err)
-			continue
-		}
-
-		log.Printf("Track downloaded successfully in %s format: %s", f, url)
-		progressCb(100.0) // Ensure 100% is reported on completion
-		return nil
-	}
-	return fmt.Errorf("all format attempts failed for track: %s", url)
+	log.Printf("Download output: %s", outBuf.String())
+	progressCb(100.0) // Assume complete for now
+	return nil
 }
 
 // ExportToRekordbox generates a Rekordbox-compatible XML file.

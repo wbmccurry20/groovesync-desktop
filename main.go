@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-//go:embed frontend/dist/**/*
+//go:embed frontend/dist/*
 var assets embed.FS
 
 func main() {
@@ -28,8 +29,8 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:  "GrooveSync",
-		Width:  1200, // Increased for new dashboard layout
-		Height: 800,  // Increased for new dashboard layout
+		Width:  1200,
+		Height: 800,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
@@ -60,7 +61,7 @@ type DownloadJob struct {
 	Progress   float64 `json:"progress"`
 	Format     string  `json:"format"`
 	OutputPath string  `json:"outputPath"`
-	CreatedAt  string  `json:"createdAt"` // Changed to string
+	CreatedAt  string  `json:"createdAt"`
 	Error      string  `json:"error,omitempty"`
 	Type       string  `json:"type"` // "single", "playlist", "batch"
 }
@@ -79,12 +80,22 @@ type Track struct {
 }
 
 func NewApp() *App {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Failed to get user home dir: %v, falling back to current dir", err)
+		homeDir = "."
+	}
+	defaultOut := filepath.Join(homeDir, "Downloads", "GrooveSync")
+	if err := os.MkdirAll(defaultOut, 0755); err != nil {
+		log.Printf("Failed to create default output dir: %v", err)
+	}
+
 	return &App{
 		downloads: make(map[string]*DownloadJob),
 		settings: &AppSettings{
 			DefaultFormat:    "wav",
 			DefaultQuality:   "high",
-			DefaultOutputDir: "./downloads",
+			DefaultOutputDir: defaultOut,
 			MaxConcurrent:    4,
 			Theme:            "dark",
 		},
@@ -93,23 +104,45 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	// Emit initial settings and stats on startup for frontend sync
+	runtime.EventsEmit(a.ctx, "settingsUpdated", a.GetSettings())
+	runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 }
 
 func (a *App) StartDownload(url, name, format, dir string) error {
+	log.Printf("Starting download: URL=%s, Name=%s, Format=%s, Dir=%s", url, name, format, dir)
+	if !a.ValidateURL(url) {
+		err := fmt.Errorf("invalid URL: %s", url)
+		log.Printf("Validation failed: %v", err)
+		return err
+	}
+	if !contains(a.GetSupportedFormats(), format) {
+		err := fmt.Errorf("unsupported format: %s", format)
+		log.Printf("Validation failed: %v", format)
+		return err
+	}
 	if dir == "" {
-		dir = a.settings.DefaultOutputDir // Use the default from settings
+		dir = a.settings.DefaultOutputDir
+		log.Printf("Using default output directory: %s", dir)
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Printf("Failed to create directory %s: %v", dir, err)
 		return err
 	}
 
 	// Create a download job
 	jobID := a.CreateDownloadJob(url, name, format, dir, "single")
+	log.Printf("Created download job ID: %s", jobID)
 
 	// Run the download in a goroutine so it doesn't block
 	go func() {
 		a.mu.Lock()
-		job := a.downloads[jobID]
+		job, exists := a.downloads[jobID]
+		if !exists {
+			log.Printf("Job %s not found after creation", jobID)
+			a.mu.Unlock()
+			return
+		}
 		job.Status = "downloading"
 		a.mu.Unlock()
 		runtime.EventsEmit(a.ctx, "downloadUpdated", job)
@@ -120,26 +153,36 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 				a.mu.Lock()
 				job.Status = status
 				a.mu.Unlock()
+				log.Printf("Status update for job %s: %s", jobID, status)
 				runtime.EventsEmit(a.ctx, "downloadUpdated", job)
 			},
 			func(current, total int) {
 				a.mu.Lock()
-				job.Progress = float64(current) / float64(total) * 100
+				if total > 0 {
+					job.Progress = float64(current) / float64(total) * 100
+				}
 				a.mu.Unlock()
+				log.Printf("Progress update for job %s: %d/%d (%.2f%%)", jobID, current, total, job.Progress)
 				runtime.EventsEmit(a.ctx, "downloadUpdated", job)
 			},
 			func(tracks []downloader.Track) {
+				log.Printf("Tracks received for job %s: %d tracks", jobID, len(tracks))
 				runtime.EventsEmit(a.ctx, "tracks", tracks)
 			},
 		)
 
+		a.mu.Lock()
 		if err != nil {
-			a.mu.Lock()
+			log.Printf("Download failed for job %s: %v", jobID, err)
 			job.Status = "failed"
 			job.Error = err.Error()
-			a.mu.Unlock()
-			runtime.EventsEmit(a.ctx, "downloadUpdated", job)
+		} else {
+			log.Printf("Download completed for job %s", jobID)
+			job.Status = "completed"
 		}
+		a.mu.Unlock()
+		runtime.EventsEmit(a.ctx, "downloadUpdated", job)
+		runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 	}()
 
 	return nil
@@ -157,6 +200,7 @@ func (a *App) ExportToRekordbox(playlistName string) error {
 			// Parse the CreatedAt string back to time.Time for comparison
 			jobTime, err := time.Parse(time.RFC3339, job.CreatedAt)
 			if err != nil {
+				log.Printf("Failed to parse CreatedAt for job %s: %v", job.ID, err)
 				continue // Skip if parsing fails
 			}
 			if latestJob == nil || jobTime.After(latestTime) {
@@ -213,6 +257,7 @@ func (a *App) CancelDownload(id string) error {
 	if job, exists := a.downloads[id]; exists {
 		job.Status = "cancelled"
 		runtime.EventsEmit(a.ctx, "downloadCancelled", id)
+		runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 		return nil
 	}
 	return fmt.Errorf("download not found")
@@ -223,8 +268,14 @@ func (a *App) GetSupportedFormats() []string {
 }
 
 func (a *App) ValidateURL(url string) bool {
-	// Basic URL validation - can be enhanced
-	return url != "" && (len(url) > 10)
+	// Enhanced validation: check length, scheme (http/https), no spaces
+	if url == "" || len(url) < 10 {
+		return false
+	}
+	if !(strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://")) {
+		return false
+	}
+	return !strings.Contains(url, " ")
 }
 
 func (a *App) GetSettings() *AppSettings {
@@ -255,20 +306,21 @@ func (a *App) CreateDownloadJob(url, title, format, outputPath, jobType string) 
 		Progress:   0,
 		Format:     format,
 		OutputPath: outputPath,
-		CreatedAt:  time.Now().Format(time.RFC3339), // Format as string
+		CreatedAt:  time.Now().Format(time.RFC3339),
 		Type:       jobType,
 	}
 
 	a.downloads[id] = job
 	runtime.EventsEmit(a.ctx, "downloadCreated", job)
+	runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 	return id
 }
 
-func (a *App) GetDownloadStats() map[string]interface{} {
+func (a *App) GetDownloadStats() map[string]int {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	stats := map[string]interface{}{
+	stats := map[string]int{
 		"total":     len(a.downloads),
 		"active":    0,
 		"completed": 0,
@@ -279,15 +331,25 @@ func (a *App) GetDownloadStats() map[string]interface{} {
 	for _, job := range a.downloads {
 		switch job.Status {
 		case "downloading", "queued":
-			stats["active"] = stats["active"].(int) + 1
+			stats["active"]++
 		case "completed":
-			stats["completed"] = stats["completed"].(int) + 1
+			stats["completed"]++
 		case "failed":
-			stats["failed"] = stats["failed"].(int) + 1
+			stats["failed"]++
 		case "cancelled":
-			stats["cancelled"] = stats["cancelled"].(int) + 1
+			stats["cancelled"]++
 		}
 	}
 
 	return stats
+}
+
+// Helper function
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

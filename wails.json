@@ -1,15 +1,16 @@
 {
-  "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "GrooveSync",
+  "name": "groovesync",
   "outputfilename": "GrooveSync",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
-  "frontend:dev:serverUrl": "auto",
-  "main": "main.go",
-  "wailsjsdir": "./frontend/wailsjs",
+  "frontend:dev:serverurl": "http://localhost:5173",
   "author": {
-    "name": "wbmccurry20",
-    "email": "wbmccurry20@gmail.com"
-  }
+    "name": "Your Name",
+    "email": "your.email@example.com"
+  },
+  "description": "A professional DJ download manager",
+  "version": "1.0.0",
+  "licence": "MIT",
+  "devServer": "http://localhost:34115"
 }
