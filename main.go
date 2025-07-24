@@ -104,13 +104,17 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	// Emit initial settings and stats on startup for frontend sync
 	runtime.EventsEmit(a.ctx, "settingsUpdated", a.GetSettings())
 	runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 }
 
 func (a *App) StartDownload(url, name, format, dir string) error {
-	log.Printf("Starting download: URL=%s, Name=%s, Format=%s, Dir=%s", url, name, format, dir)
+	// Fixed log: Handle empty dir for complete output (shows "(default)" if empty)
+	logDir := dir
+	if dir == "" {
+		logDir = "(default)"
+	}
+	log.Printf("Starting download: URL=%s, Name=%s, Format=%s, Dir=%s", url, name, format, logDir)
 	if !a.ValidateURL(url) {
 		err := fmt.Errorf("invalid URL: %s", url)
 		log.Printf("Validation failed: %v", err)
@@ -134,8 +138,22 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 	jobID := a.CreateDownloadJob(url, name, format, dir, "single")
 	log.Printf("Created download job ID: %s", jobID)
 
-	// Run the download in a goroutine so it doesn't block
+	// Run the download in a goroutine with panic recovery
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in download goroutine for job %s: %v", jobID, r)
+				a.mu.Lock()
+				if job, exists := a.downloads[jobID]; exists {
+					job.Status = "failed"
+					job.Error = fmt.Sprintf("Unexpected error: %v", r)
+					runtime.EventsEmit(a.ctx, "downloadUpdated", job)
+				}
+				a.mu.Unlock()
+				runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
+			}
+		}()
+
 		a.mu.Lock()
 		job, exists := a.downloads[jobID]
 		if !exists {
@@ -149,6 +167,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 
 		err := downloader.RunYTDLPParallel(
 			url, dir, name, format,
+			int64(a.settings.MaxConcurrent),
 			func(status string) {
 				a.mu.Lock()
 				job.Status = status
@@ -192,16 +211,14 @@ func (a *App) ExportToRekordbox(playlistName string) error {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	// Find the most recent completed job with the given playlist name
 	var latestJob *DownloadJob
 	var latestTime time.Time
 	for _, job := range a.downloads {
 		if job.Title == playlistName && job.Status == "completed" {
-			// Parse the CreatedAt string back to time.Time for comparison
 			jobTime, err := time.Parse(time.RFC3339, job.CreatedAt)
 			if err != nil {
 				log.Printf("Failed to parse CreatedAt for job %s: %v", job.ID, err)
-				continue // Skip if parsing fails
+				continue
 			}
 			if latestJob == nil || jobTime.After(latestTime) {
 				latestJob = job
@@ -214,13 +231,11 @@ func (a *App) ExportToRekordbox(playlistName string) error {
 		return fmt.Errorf("no completed download found for playlist: %s", playlistName)
 	}
 
-	// Call the downloader's export function
 	playlistDir := filepath.Join(latestJob.OutputPath, playlistName)
 	if err := downloader.ExportToRekordbox(playlistDir, playlistName); err != nil {
 		return fmt.Errorf("failed to export to Rekordbox: %w", err)
 	}
 
-	// Emit the export path to the frontend
 	exportPath := filepath.Join(playlistDir, playlistName+".xml")
 	runtime.EventsEmit(a.ctx, "exportCompleted", map[string]string{"path": exportPath})
 	return nil
@@ -268,7 +283,6 @@ func (a *App) GetSupportedFormats() []string {
 }
 
 func (a *App) ValidateURL(url string) bool {
-	// Enhanced validation: check length, scheme (http/https), no spaces
 	if url == "" || len(url) < 10 {
 		return false
 	}
@@ -344,7 +358,6 @@ func (a *App) GetDownloadStats() map[string]int {
 	return stats
 }
 
-// Helper function
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

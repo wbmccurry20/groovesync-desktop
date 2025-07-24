@@ -4,13 +4,12 @@
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
-  "frontend:dev:serverurl": "http://localhost:5173",
   "author": {
-    "name": "Your Name",
-    "email": "your.email@example.com"
+    "name": "Will McCurry",
+    "email": "wbmccurry20@icloud.com"
   },
   "description": "A professional DJ download manager",
   "version": "1.0.0",
   "licence": "MIT",
-  "devServer": "http://localhost:34115"
+  "devServer": "localhost:5173"
 }

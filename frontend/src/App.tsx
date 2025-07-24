@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { StartDownload, ExportToRekordbox } from '../wailsjs/go/main/App';
+import { StartDownload, ExportToRekordbox, GetAllDownloads } from '../wailsjs/go/main/App';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 import { Music, Link, Folder, Download, FileText, RotateCcw, Palette, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import WaveSurfer from 'wavesurfer.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import './App.css';
+import { main } from '../wailsjs/go/models'; // Import the main namespace
 
 interface Progress {
     current: number;
@@ -27,9 +28,10 @@ function App() {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadHistory, setDownloadHistory] = useState<string[]>([]);
-    const [exportPath, setExportPath] = useState<string>(''); 
+    const [exportPath, setExportPath] = useState<string>('');
     const [theme, setTheme] = useState<'dark' | 'neon'>('neon');
     const waveformRefs = useRef<Map<number, WaveSurfer>>(new Map());
+    const [jobs, setJobs] = useState<main.DownloadJob[]>([]); // Jobs state for real-time updates
 
     useEffect(() => {
         const savedTheme = localStorage.getItem('theme') as 'dark' | 'neon' || 'neon';
@@ -37,39 +39,50 @@ function App() {
         document.documentElement.classList.toggle('neon-theme', savedTheme === 'neon');
         document.documentElement.classList.toggle('dark-theme', savedTheme === 'dark');
 
-        EventsOn('status', (status: string) => {
-            setStatus(status);
-            if (status.includes("downloaded successfully")) {
-                setIsDownloading(false);
-                setDownloadHistory(prev => [`${name} - ${new Date().toLocaleTimeString()}`, ...prev.slice(0, 4)]);
-            } else if (status.includes("failed")) {
-                setIsDownloading(false);
-            }
+        // Backend event listeners (added 'settingsUpdated' and 'downloadStatsUpdated' to fix "No listeners" logs)
+        EventsOn('downloadCreated', (job: main.DownloadJob) => {
+            setJobs(prev => [...prev, main.DownloadJob.createFrom(job)]);
+            setStatus('Download job created. Extracting tracks...');
         });
-        EventsOn('progress', (progress: Progress) => setProgress(progress));
+        EventsOn('downloadUpdated', (job: main.DownloadJob) => {
+            setJobs(prev => prev.map(j => j.id === job.id ? main.DownloadJob.createFrom(job) : j));
+            setStatus(job.status);
+            if (job.status === "completed") {
+                setIsDownloading(false);
+                setDownloadHistory(prev => [`${job.title} - ${new Date().toLocaleTimeString()}`, ...prev.slice(0, 4)]);
+            } else if (job.status === "failed") {
+                setIsDownloading(false);
+                setStatus(job.error || 'Download failed. Check logs.');
+            }
+            setProgress({ current: Math.round(job.progress), total: 100 });
+        });
         EventsOn('tracks', (tracks: Track[]) => {
             setTracks(tracks);
-            tracks.forEach((track, index) => {
-                if (index < progress.current) {
-                    track.audioPath = `/path/to/downloaded/${track.title}.${format}`;
-                }
-            });
         });
         EventsOn('exportCompleted', (data: { path: string }) => {
             setExportPath(data.path);
             setStatus(`Exported to Rekordbox successfully! File: ${data.path}`);
         });
+        EventsOn('settingsUpdated', (settings: main.AppSettings) => {
+            console.log('Settings updated:', settings); // Optional: Update UI if needed (e.g., theme)
+        });
+        EventsOn('downloadStatsUpdated', (stats: { total: number, active: number, completed: number }) => {
+            console.log('Download stats:', stats); // Optional: Update UI dashboard if added
+        });
+
+        GetAllDownloads().then(jobs => setJobs(jobs.map(j => main.DownloadJob.createFrom(j))));
 
         return () => {
             waveformRefs.current.forEach(ws => ws.destroy());
         };
-    }, [name, format, progress.current]);
+    }, []);
 
     useEffect(() => {
         tracks.forEach((track, index) => {
-            if (index < progress.current && track.audioPath && !waveformRefs.current.has(index)) {
+            if (index < Math.round(progress.current / 100 * tracks.length) && !waveformRefs.current.has(index)) {
                 const container = document.getElementById(`waveform-${index}`);
-                if (container) {
+                if (container && jobs.find(j => j.status === "completed")) {
+                    const audioPath = `${jobs.find(j => j.status === "completed")?.outputPath}/${track.title}.${format}`;
                     const ws = WaveSurfer.create({
                         container,
                         waveColor: '#00FFFF',
@@ -78,12 +91,12 @@ function App() {
                         barWidth: 2,
                         barGap: 1,
                     });
-                    ws.load(track.audioPath);
+                    ws.load(audioPath);
                     waveformRefs.current.set(index, ws);
                 }
             }
         });
-    }, [tracks, progress.current]);
+    }, [tracks, progress.current, jobs, format]);
 
     const handleStartDownload = async () => {
         if (!url || !name) {
@@ -93,10 +106,12 @@ function App() {
         setIsDownloading(true);
         setProgress({ current: 0, total: 0 });
         setExportPath('');
+        setTracks([]);
         try {
             await StartDownload(url, name, format, dir);
+            setStatus('Download initiated. Check progress...');
         } catch (error) {
-            setStatus('Download failed. Check logs.');
+            setStatus('Download initiation failed. Check logs.');
             setIsDownloading(false);
             console.error('Download error:', error);
         }
@@ -123,6 +138,7 @@ function App() {
         setProgress({ current: 0, total: 0 });
         setExportPath('');
         setStatus('Ready to start downloading...');
+        setJobs([]);
     };
 
     const toggleTheme = () => {
@@ -135,16 +151,13 @@ function App() {
 
     return (
         <div className="min-h-screen bg-club-gradient text-white flex flex-col">
-            {/* Header */}
             <header className="bg-navy-dark/90 backdrop-blur-lg border-b border-club-gray p-4 shadow-neon rounded-t-lg">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ duration: 0.5 }}>
                             <Music className="w-10 h-10 text-neon-blue" />
                         </motion.div>
-                        <h1 className="text-2xl font-extrabold text-neon-blue">
-                            GrooveSync
-                        </h1>
+                        <h1 className="text-2xl font-extrabold text-neon-blue">GrooveSync</h1>
                     </div>
                     <p className="text-text-secondary text-xs font-medium">Professional DJ Download Manager</p>
                     <button onClick={toggleTheme} className="p-1 rounded-full hover:bg-club-gray">
@@ -154,8 +167,7 @@ function App() {
             </header>
 
             <div className="flex-1 max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-                {/* Sidebar */}
-                <motion.aside 
+                <motion.aside
                     className="lg:col-span-1 bg-navy-light/80 backdrop-blur-lg rounded-lg p-4 border border-club-gray shadow-neon space-y-4"
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -178,10 +190,8 @@ function App() {
                     </div>
                 </motion.aside>
 
-                {/* Main Content */}
                 <div className="lg:col-span-3 space-y-6 flex flex-col gap-6">
-                    {/* Download Form Card */}
-                    <motion.div 
+                    <motion.div
                         className="bg-navy-light/80 backdrop-blur-lg rounded-lg p-6 border border-club-gray shadow-neon flex-1"
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -295,9 +305,8 @@ function App() {
                         </div>
                     </motion.div>
 
-                    {/* Progress Dashboard */}
                     {progress.total > 0 && (
-                        <motion.div 
+                        <motion.div
                             className="bg-navy-light/80 backdrop-blur-lg rounded-lg p-4 border border-club-gray shadow-neon"
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -322,9 +331,8 @@ function App() {
                         </motion.div>
                     )}
 
-                    {/* Track Dashboard */}
                     {tracks.length > 0 && (
-                        <motion.div 
+                        <motion.div
                             className="bg-navy-light/80 backdrop-blur-lg rounded-lg p-4 border border-club-gray shadow-neon overflow-hidden"
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -344,9 +352,9 @@ function App() {
                                             exit={{ opacity: 0, y: -20 }}
                                             transition={{ duration: 0.3, delay: index * 0.05 }}
                                             className={`flex flex-col p-3 rounded-lg transition-all ${
-                                                index < progress.current
+                                                index < Math.round(progress.current / 100 * tracks.length)
                                                     ? 'bg-neon-blue/20 border-neon-blue/40 text-white'
-                                                    : index === progress.current && isDownloading
+                                                    : index === Math.round(progress.current / 100 * tracks.length) && isDownloading
                                                     ? 'bg-neon-purple/20 border-neon-purple/40 animate-pulse text-white'
                                                     : 'bg-club-gray border-club-gray text-text-secondary'
                                             }`}
@@ -356,13 +364,13 @@ function App() {
                                                     {String(index + 1).padStart(2, '0')}.
                                                 </span>
                                                 <span className="text-xs flex-1 truncate">{track.title}</span>
-                                                {index < progress.current ? (
+                                                {index < Math.round(progress.current / 100 * tracks.length) ? (
                                                     <CheckCircle className="text-neon-blue min-w-[0.75rem]" />
-                                                ) : index === progress.current && isDownloading ? (
+                                                ) : index === Math.round(progress.current / 100 * tracks.length) && isDownloading ? (
                                                     <Loader2 className="text-neon-purple min-w-[0.75rem] animate-spin" />
                                                 ) : null}
                                             </div>
-                                            {index < progress.current && track.audioPath && (
+                                            {index < Math.round(progress.current / 100 * tracks.length) && jobs.find(j => j.status === "completed") && (
                                                 <div className="waveform-container mt-1">
                                                     <div id={`waveform-${index}`} className="w-full" />
                                                 </div>
@@ -374,8 +382,7 @@ function App() {
                         </motion.div>
                     )}
 
-                    {/* Status Panel */}
-                    <motion.div 
+                    <motion.div
                         className="bg-navy-light/80 backdrop-blur-lg rounded-lg p-4 border border-club-gray shadow-neon"
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -407,9 +414,8 @@ function App() {
                         )}
                     </motion.div>
 
-                    {/* Recent Downloads */}
                     {downloadHistory.length > 0 && (
-                        <motion.div 
+                        <motion.div
                             className="bg-navy-light/80 backdrop-blur-lg rounded-lg p-4 border border-club-gray shadow-neon"
                             initial={{ opacity: 0, y: 50 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -435,7 +441,6 @@ function App() {
                 </div>
             </div>
 
-            {/* Footer */}
             <footer className="bg-navy-dark/90 backdrop-blur-lg border-t border-club-gray p-3 mt-6">
                 <div className="max-w-7xl mx-auto text-center text-text-secondary text-xs">
                     <p>© 2025 GrooveSync. All rights reserved.</p>

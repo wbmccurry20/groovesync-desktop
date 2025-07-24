@@ -6,16 +6,20 @@ set -e
 # Optional arg for platform (e.g., darwin/arm64, windows/amd64, linux/amd64)
 PLATFORM="${1:-darwin/arm64}"
 
+# Versions (pin for stability)
+YTDLP_VERSION="2025.07.21"
+FFMPEG_VERSION="7.0.2"
+
 # Clean previous artifacts
 echo "Cleaning up previous build artifacts..."
-rm -rf dist build/bin GrooveSync.app
+rm -rf dist build/bin GrooveSync.app bin
 
-# Ensure Go is installed (version 1.22+ recommended for latest Wails)
+# Ensure Go is installed (1.22+)
 echo "Checking for Go installation..."
 if ! command -v go &> /dev/null; then
     echo "Go is not installed. Installing latest Go..."
     if [[ "$(uname)" == "Darwin" ]]; then
-        brew install go || (echo "Install Homebrew first: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; exit 1)
+        brew install go || (echo "Install Homebrew first: /bin/bash -c \"$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""; exit 1)
     elif [[ "$(uname)" == "Linux" ]]; then
         sudo apt update && sudo apt install -y golang-go
     else
@@ -25,7 +29,7 @@ if ! command -v go &> /dev/null; then
 fi
 export PATH=$PATH:$(go env GOPATH)/bin:$HOME/go/bin
 
-# Ensure Wails is installed (latest v2)
+# Ensure Wails is installed (v2.10.1+)
 echo "Checking for Wails installation..."
 if ! command -v wails &> /dev/null; then
     echo "Wails not installed. Installing latest..."
@@ -64,19 +68,17 @@ cd ..
 echo "Preparing Go modules..."
 go mod tidy
 
-# Clean any existing wailsjs to avoid duplicates/nesting
+# Clean existing wailsjs
 echo "Cleaning existing wailsjs directories..."
 rm -rf frontend/wailsjs
 
-# Generate Wails bindings with debug output
+# Generate Wails bindings
 echo "Generating Wails bindings..."
 wails generate module
-if [ ! -d "frontend/wailsjs" ] || [ ! -f "frontend/wailsjs/go/main/App.js" ] || [ ! -f "frontend/wailsjs/runtime/runtime.js" ]; then
-    echo "Error: Wails bindings generation failed or incomplete. Check wails.json and Go code."
+if [ ! -d "frontend/wailsjs" ]; then
+    echo "Error: Wails bindings generation failed."
     exit 1
 fi
-echo "Bindings generated successfully. Contents of frontend/wailsjs:"
-ls -R frontend/wailsjs
 
 # Build frontend
 echo "Building frontend..."
@@ -84,81 +86,75 @@ cd frontend
 npm run build
 cd ..
 
-# Download yt-dlp based on platform
+# Create bin dir for staging
 mkdir -p bin
-function download_ytdlp() {
-    local binary_name=$1
-    local url="https://github.com/yt-dlp/yt-dlp/releases/latest/download/$binary_name"
-    if [[ ! -f "bin/$binary_name" ]]; then
-        echo "Downloading yt-dlp: $binary_name..."
-        curl -L -o "bin/$binary_name" "$url"
-        chmod +x "bin/$binary_name"
-    fi
-}
 
+# Download yt-dlp (platform-specific)
+echo "Downloading yt-dlp v$YTDLP_VERSION for $PLATFORM..."
 case "$PLATFORM" in
     darwin/arm64|darwin/amd64)
-        download_ytdlp "yt-dlp_macos"
+        curl -L -o "bin/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp_macos"
         ;;
     windows/amd64)
-        download_ytdlp "yt-dlp.exe"
+        curl -L -o "bin/yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp.exe"
         ;;
     linux/amd64)
-        download_ytdlp "yt-dlp_linux"
+        curl -L -o "bin/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp_linux"
         ;;
     *)
         echo "Unsupported platform: $PLATFORM"
         exit 1
         ;;
 esac
+chmod +x bin/yt-dlp*
 
-# Download ffmpeg/ffprobe (platform-specific; fallback to system install if fail)
-function download_ffmpeg() {
-    if [[ "$PLATFORM" == *"darwin"* ]]; then
-        if [[ ! -f "bin/ffmpeg" ]] || [[ ! -f "bin/ffprobe" ]]; then
-            echo "Downloading ffmpeg for macOS..."
-            curl -L -o "bin/ffmpeg.zip" https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
-            unzip -o "bin/ffmpeg.zip" -d "bin/" && mv bin/ffmpeg bin/ffmpeg && chmod +x bin/ffmpeg
-            curl -L -o "bin/ffprobe.zip" https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
-            unzip -o "bin/ffprobe.zip" -d "bin/" && mv bin/ffprobe bin/ffprobe && chmod +x bin/ffprobe
-            rm bin/*.zip
-        fi
-    elif [[ "$PLATFORM" == *"linux"* ]]; then
-        if [[ ! -f "bin/ffmpeg" ]] || [[ ! -f "bin/ffprobe" ]]; then
-            echo "Downloading ffmpeg for Linux..."
-            curl -L -o "bin/ffmpeg.tar.xz" https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
-            tar -xJf "bin/ffmpeg.tar.xz" -C "bin/" --strip-components=1 "ffmpeg-*/ffmpeg" "ffmpeg-*/ffprobe"
-            chmod +x bin/ffmpeg bin/ffprobe
-            rm bin/*.tar.xz
-        fi
-    elif [[ "$PLATFORM" == *"windows"* ]]; then
-        if [[ ! -f "bin/ffmpeg.exe" ]] || [[ ! -f "bin/ffprobe.exe" ]]; then
-            echo "Downloading ffmpeg for Windows..."
-            curl -L -o "bin/ffmpeg.zip" https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-            unzip -o "bin/ffmpeg.zip" -d "bin/" "ffmpeg-*/bin/ffmpeg.exe" "ffmpeg-*/bin/ffprobe.exe"
-            mv bin/ffmpeg-*/bin/ffmpeg.exe bin/ffmpeg.exe
-            mv bin/ffmpeg-*/bin/ffprobe.exe bin/ffprobe.exe
-            rm -rf bin/ffmpeg-* bin/*.zip
-        fi
-    fi
-}
-download_ffmpeg
+# Download ffmpeg and ffprobe (separate for evermeet)
+echo "Downloading ffmpeg v$FFMPEG_VERSION for $PLATFORM..."
+case "$PLATFORM" in
+    darwin/arm64|darwin/amd64)
+        curl -L -o "bin/ffmpeg.zip" "https://evermeet.cx/ffmpeg/ffmpeg-$FFMPEG_VERSION.zip"
+        unzip -o "bin/ffmpeg.zip" -d "bin/"
+        rm "bin/ffmpeg.zip"
+        
+        echo "Downloading ffprobe v$FFMPEG_VERSION..."
+        curl -L -o "bin/ffprobe.zip" "https://evermeet.cx/ffmpeg/ffprobe-$FFMPEG_VERSION.zip"
+        unzip -o "bin/ffprobe.zip" -d "bin/"
+        rm "bin/ffprobe.zip"
+        ;;
+    windows/amd64)
+        curl -L -o "bin/ffmpeg.zip" "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+        unzip -o "bin/ffmpeg.zip" "ffmpeg-$FFMPEG_VERSION-essentials_build/bin/ffmpeg.exe" "ffmpeg-$FFMPEG_VERSION-essentials_build/bin/ffprobe.exe" -d "bin/"
+        mv bin/ffmpeg-$FFMPEG_VERSION-essentials_build/bin/ffmpeg.exe bin/ffmpeg.exe
+        mv bin/ffmpeg-$FFMPEG_VERSION-essentials_build/bin/ffprobe.exe bin/ffprobe.exe
+        rm -rf bin/ffmpeg-$FFMPEG_VERSION-essentials_build bin/ffmpeg.zip
+        ;;
+    linux/amd64)
+        curl -L -o "bin/ffmpeg.tar.xz" "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+        tar -xJf "bin/ffmpeg.tar.xz" -C "bin/" --strip-components=1 "ffmpeg-*/ffmpeg" "ffmpeg-*/ffprobe"
+        rm "bin/ffmpeg.tar.xz"
+        ;;
+    *)
+        echo "Unsupported platform for ffmpeg: $PLATFORM"
+        exit 1
+        ;;
+esac
+chmod +x bin/ffmpeg* bin/ffprobe*
 
 # Build the app
 echo "Building for $PLATFORM..."
 wails build -platform "$PLATFORM" -o GrooveSync -clean
 
-# Copy binaries to build dir (adjust for platform bundle structure)
+# Copy binaries to bundle
 mkdir -p dist
 if [[ "$PLATFORM" == *"darwin"* ]]; then
     cp -r build/bin/GrooveSync.app dist/
     mkdir -p dist/GrooveSync.app/Contents/MacOS/bin
-    cp bin/yt-dlp_macos dist/GrooveSync.app/Contents/MacOS/bin/yt-dlp
+    cp bin/yt-dlp dist/GrooveSync.app/Contents/MacOS/bin/yt-dlp
     cp bin/ffmpeg dist/GrooveSync.app/Contents/MacOS/bin/ffmpeg
     cp bin/ffprobe dist/GrooveSync.app/Contents/MacOS/bin/ffprobe
     chmod +x dist/GrooveSync.app/Contents/MacOS/bin/*
-    
-    # Info.plist (enhanced with more keys for stability)
+
+    # Info.plist (enhanced for stability)
     cat > dist/GrooveSync.app/Contents/Info.plist <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -184,7 +180,7 @@ if [[ "$PLATFORM" == *"darwin"* ]]; then
 </plist>
 EOL
 
-    # Fix security
+    # Fix security (remove quarantine for double-click launch)
     xattr -cr dist/GrooveSync.app
     chmod +x dist/GrooveSync.app/Contents/MacOS/GrooveSync
 elif [[ "$PLATFORM" == *"windows"* ]]; then
@@ -196,18 +192,14 @@ elif [[ "$PLATFORM" == *"windows"* ]]; then
 elif [[ "$PLATFORM" == *"linux"* ]]; then
     cp build/bin/GrooveSync dist/
     mkdir -p dist/bin
-    cp bin/yt-dlp_linux dist/bin/yt-dlp
+    cp bin/yt-dlp dist/bin/yt-dlp
     cp bin/ffmpeg dist/bin/ffmpeg
     cp bin/ffprobe dist/bin/ffprobe
-    chmod +x dist/bin/*
+    chmod +x dist/*
 fi
+
+# Clean up staging bin
+rm -rf bin
 
 echo "Build complete! Artifacts in dist/"
-echo "To run on macOS: open dist/GrooveSync.app"
-echo "If security warning: right-click > Open, or xattr -d com.apple.quarantine dist/GrooveSync.app"
-
-# Auto-test launch if mac
-if [[ "$PLATFORM" == *"darwin"* ]]; then
-    echo "Testing launch..."
-    open dist/GrooveSync.app || echo "Launch failed; check logs."
-fi
+echo "To run on macOS: open dist/GrooveSync.app (double-click should work; if warning, right-click > Open first time)"

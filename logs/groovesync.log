@@ -5,3 +5,132 @@
 2025/07/19 17:25:23 logger.go:41: Logger initialized with rotation
 2025/07/19 17:31:03 logger.go:41: Logger initialized with rotation
 2025/07/19 17:31:09 logger.go:41: Logger initialized with rotation
+2025/07/22 23:32:38 logger.go:41: Logger initialized with rotation
+2025/07/22 23:33:13 logger.go:41: Logger initialized with rotation
+2025/07/23 00:05:33 logger.go:41: Logger initialized with rotation
+2025/07/23 00:05:42 logger.go:41: Logger initialized with rotation
+2025/07/23 00:06:56 logger.go:41: Logger initialized with rotation
+2025/07/23 00:07:15 main.go:113: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=245793a9fe374aeb87b977fe6b38bd7e&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=test_playlist, Format=wav, Dir=
+2025/07/23 00:07:15 main.go:126: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 00:25:29 logger.go:41: Logger initialized with rotation
+2025/07/23 00:25:38 logger.go:41: Logger initialized with rotation
+2025/07/23 00:25:43 logger.go:41: Logger initialized with rotation
+2025/07/23 00:26:14 main.go:113: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=6c8bb0b50a624ef78dc74aa41f7dc440&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 00:26:14 main.go:126: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 00:29:58 logger.go:41: Logger initialized with rotation
+2025/07/23 00:30:08 logger.go:41: Logger initialized with rotation
+2025/07/23 00:30:47 logger.go:41: Logger initialized with rotation
+2025/07/23 00:30:58 logger.go:41: Logger initialized with rotation
+2025/07/23 00:31:01 logger.go:41: Logger initialized with rotation
+2025/07/23 00:31:12 logger.go:41: Logger initialized with rotation
+2025/07/23 00:31:24 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=069bc1041cc34bc8ac57aab9b9e3d012&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 00:31:24 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 00:39:05 logger.go:41: Logger initialized with rotation
+2025/07/23 00:39:13 logger.go:41: Logger initialized with rotation
+2025/07/23 00:39:18 logger.go:41: Logger initialized with rotation
+2025/07/23 00:39:35 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=1efaab1eb4474ab0ba075fec279f9b7d&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 00:39:35 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 00:53:44 logger.go:41: Logger initialized with rotation
+2025/07/23 00:53:53 logger.go:41: Logger initialized with rotation
+2025/07/23 00:54:00 logger.go:41: Logger initialized with rotation
+2025/07/23 00:54:10 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=700f9b0835d240e39389791b16b28891&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 00:54:10 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 00:58:34 logger.go:41: Logger initialized with rotation
+2025/07/23 00:58:43 logger.go:41: Logger initialized with rotation
+2025/07/23 00:58:48 logger.go:41: Logger initialized with rotation
+2025/07/23 00:59:00 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=74ff47bc80f5446bbaa51cee6f051a7b&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 00:59:00 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 01:07:49 logger.go:41: Logger initialized with rotation
+2025/07/23 01:08:29 logger.go:41: Logger initialized with rotation
+2025/07/23 01:08:37 logger.go:41: Logger initialized with rotation
+2025/07/23 01:08:42 logger.go:41: Logger initialized with rotation
+2025/07/23 01:08:52 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=69ac70f18d124bfc90c98e81dc8ae62b&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 01:08:52 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 02:17:56 logger.go:41: Logger initialized with rotation
+2025/07/23 02:18:06 logger.go:41: Logger initialized with rotation
+2025/07/23 02:18:12 logger.go:41: Logger initialized with rotation
+2025/07/23 02:18:22 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=cd74f138a6754e9e9a3bf4b1a1f1960b&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 02:18:22 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 02:28:15 logger.go:41: Logger initialized with rotation
+2025/07/23 02:28:22 logger.go:41: Logger initialized with rotation
+2025/07/23 02:28:31 logger.go:41: Logger initialized with rotation
+2025/07/23 02:28:36 logger.go:41: Logger initialized with rotation
+2025/07/23 02:28:48 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=a3d9cc84ff134a0dad689e1623884f1f&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 02:28:48 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 02:33:48 logger.go:41: Logger initialized with rotation
+2025/07/23 02:33:56 logger.go:41: Logger initialized with rotation
+2025/07/23 02:34:01 logger.go:41: Logger initialized with rotation
+2025/07/23 02:34:21 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=736ef51972724f0baae2c29e2d078c57&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 02:34:21 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 02:41:40 logger.go:41: Logger initialized with rotation
+2025/07/23 02:41:48 logger.go:41: Logger initialized with rotation
+2025/07/23 02:41:53 logger.go:41: Logger initialized with rotation
+2025/07/23 02:42:08 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=d8c60bf4e71a493ea254408762d2cd19&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 02:42:08 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 10:44:47 logger.go:41: Logger initialized with rotation
+2025/07/23 10:45:00 logger.go:41: Logger initialized with rotation
+2025/07/23 10:45:06 logger.go:41: Logger initialized with rotation
+2025/07/23 10:46:50 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=f0a1e6e66b9b41719431ef213603971a&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 10:46:50 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 11:01:39 logger.go:41: Logger initialized with rotation
+2025/07/23 11:06:36 logger.go:41: Logger initialized with rotation
+2025/07/23 11:09:11 logger.go:41: Logger initialized with rotation
+2025/07/23 11:16:09 logger.go:41: Logger initialized with rotation
+2025/07/23 11:16:29 logger.go:41: Logger initialized with rotation
+2025/07/23 11:23:26 logger.go:41: Logger initialized with rotation
+2025/07/23 11:23:48 logger.go:41: Logger initialized with rotation
+2025/07/23 11:24:07 logger.go:41: Logger initialized with rotation
+2025/07/23 11:24:15 logger.go:41: Logger initialized with rotation
+2025/07/23 11:24:20 logger.go:41: Logger initialized with rotation
+2025/07/23 11:24:35 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=1a6853f9f47b4329880b39fccc7904dd&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 11:24:35 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 11:49:40 logger.go:41: Logger initialized with rotation
+2025/07/23 11:49:50 logger.go:41: Logger initialized with rotation
+2025/07/23 11:49:54 logger.go:41: Logger initialized with rotation
+2025/07/23 11:50:03 logger.go:41: Logger initialized with rotation
+2025/07/23 11:50:18 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=ab1da39be4b74feead911833ee63d904&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing, Format=wav, Dir=
+2025/07/23 11:50:18 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 11:55:32 logger.go:41: Logger initialized with rotation
+2025/07/23 11:55:40 logger.go:41: Logger initialized with rotation
+2025/07/23 11:55:45 logger.go:41: Logger initialized with rotation
+2025/07/23 11:56:22 main.go:112: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=0d6f7cf2b27c4a6891cc73825c28e1f2&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing_1, Format=wav, Dir=
+2025/07/23 11:56:22 main.go:125: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 12:28:19 logger.go:41: Logger initialized with rotation
+2025/07/23 12:28:41 logger.go:41: Logger initialized with rotation
+2025/07/23 12:29:00 logger.go:41: Logger initialized with rotation
+2025/07/23 12:29:08 logger.go:41: Logger initialized with rotation
+2025/07/23 12:29:13 logger.go:41: Logger initialized with rotation
+2025/07/23 12:29:27 main.go:117: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=e5a8a17d91f34652883c44fdd03f09c7&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing_123, Format=wav, Dir=(default)
+2025/07/23 12:29:27 main.go:130: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 12:29:54 logger.go:41: Logger initialized with rotation
+2025/07/23 12:30:03 logger.go:41: Logger initialized with rotation
+2025/07/23 12:30:08 logger.go:41: Logger initialized with rotation
+2025/07/23 12:30:33 main.go:117: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=7c27a20a931841cd960705d01850d536&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing_123, Format=wav, Dir=/Users/will/Desktop
+2025/07/23 12:42:44 logger.go:41: Logger initialized with rotation
+2025/07/23 12:42:52 logger.go:41: Logger initialized with rotation
+2025/07/23 12:42:57 logger.go:41: Logger initialized with rotation
+2025/07/23 12:53:36 logger.go:41: Logger initialized with rotation
+2025/07/23 12:53:58 logger.go:41: Logger initialized with rotation
+2025/07/23 12:55:44 logger.go:41: Logger initialized with rotation
+2025/07/23 12:55:53 logger.go:41: Logger initialized with rotation
+2025/07/23 12:55:58 logger.go:41: Logger initialized with rotation
+2025/07/23 12:56:34 main.go:117: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=8c72a1195ea94aedb550cc108bd48000&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing123, Format=wav, Dir=(default)
+2025/07/23 12:56:34 main.go:130: Using default output directory: /Users/will/Downloads/GrooveSync
+2025/07/23 13:00:36 logger.go:41: Logger initialized with rotation
+2025/07/23 13:01:05 logger.go:41: Logger initialized with rotation
+2025/07/23 13:01:56 logger.go:41: Logger initialized with rotation
+2025/07/23 13:02:05 logger.go:41: Logger initialized with rotation
+2025/07/23 13:02:11 logger.go:41: Logger initialized with rotation
+2025/07/23 13:07:27 logger.go:41: Logger initialized with rotation
+2025/07/23 13:07:41 logger.go:41: Logger initialized with rotation
+2025/07/23 13:12:59 logger.go:41: Logger initialized with rotation
+2025/07/23 13:13:09 logger.go:41: Logger initialized with rotation
+2025/07/23 13:13:15 logger.go:41: Logger initialized with rotation
+2025/07/23 14:21:40 logger.go:41: Logger initialized with rotation
+2025/07/23 14:21:47 logger.go:41: Logger initialized with rotation
+2025/07/23 14:22:07 logger.go:41: Logger initialized with rotation
+2025/07/23 14:22:21 logger.go:41: Logger initialized with rotation
+2025/07/23 14:22:29 logger.go:41: Logger initialized with rotation
+2025/07/23 14:22:34 logger.go:41: Logger initialized with rotation
+2025/07/23 14:22:47 main.go:117: Starting download: URL=https://soundcloud.com/will-mccurry-896547014/sets/test?si=18dee464509e460a8a39579dfeea586e&utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing, Name=testing123, Format=wav, Dir=(default)
+2025/07/23 14:22:47 main.go:130: Using default output directory: /Users/will/Downloads/GrooveSync

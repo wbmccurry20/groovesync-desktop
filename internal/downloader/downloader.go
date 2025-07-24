@@ -1,7 +1,6 @@
 package downloader
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,174 +9,141 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"golang.org/x/sync/semaphore"
 )
 
-// Track represents a single track with metadata.
-type Track struct {
-	URL   string `json:"url"`
-	Title string `json:"title"`
-}
-
-// getBinaryPaths locates both yt-dlp and ffmpeg binaries based on the OS and environment.
-func getBinaryPaths() (ytdlpPath, ffmpegPath string, err error) {
-	var ytdlpBinaryName, ffmpegBinaryName string
-
-	// Determine binary names based on OS
-	switch runtime.GOOS {
-	case "darwin":
-		ytdlpBinaryName = "yt-dlp_macos"
-		ffmpegBinaryName = "ffmpeg"
-	case "linux":
-		ytdlpBinaryName = "yt-dlp"
-		ffmpegBinaryName = "ffmpeg"
-	case "windows":
-		ytdlpBinaryName = "yt-dlp.exe"
-		ffmpegBinaryName = "ffmpeg.exe"
-	default:
-		return "", "", fmt.Errorf("unsupported platform: %s", runtime.GOOS)
-	}
-
-	// Try the directory of the running executable (for bundled app)
+// getYTDLPBinaryPath determines the path to the yt-dlp binary based on the OS and architecture.
+func getYTDLPBinaryPath() (string, error) {
+	// Check if running inside the .app bundle
 	execPath, err := os.Executable()
 	if err == nil {
-		execDir := filepath.Dir(execPath)
-		// On macOS, adjust for app bundle
-		if runtime.GOOS == "darwin" {
-			execDir = filepath.Join(execDir, "..", "Resources", "bin")
-		} else {
-			execDir = filepath.Join(execDir, "bin")
-		}
-		ytdlpPath = filepath.Join(execDir, ytdlpBinaryName)
-		ffmpegPath = filepath.Join(execDir, ffmpegBinaryName)
-
-		// Verify binaries exist
-		if _, err := os.Stat(ytdlpPath); err == nil {
-			if _, err := os.Stat(ffmpegPath); err == nil {
-				log.Printf("Using bundled binaries: yt-dlp=%s, ffmpeg=%s", ytdlpPath, ffmpegPath)
-				return ytdlpPath, ffmpegPath, nil
-			}
+		// Get the directory of the executable (e.g., GrooveSync.app/Contents/MacOS/)
+		bundlePath := filepath.Dir(execPath)
+		// Look for yt-dlp_macos in Contents/MacOS/bin/
+		binaryPath := filepath.Join(bundlePath, "bin", "yt-dlp_macos")
+		if _, err := os.Stat(binaryPath); err == nil {
+			// Binary found inside the .app bundle
+			return binaryPath, nil
 		}
 	}
 
-	// Fallback: try the bin/ directory in the project root (for development)
-	baseDir, err := os.Getwd()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get working directory: %v", err)
-	}
-	binDir := filepath.Join(baseDir, "bin")
-	ytdlpPath = filepath.Join(binDir, ytdlpBinaryName)
-	ffmpegPath = filepath.Join(binDir, ffmpegBinaryName)
-
-	// Verify binaries exist
-	if _, err := os.Stat(ytdlpPath); err != nil {
-		return "", "", fmt.Errorf("yt-dlp binary not found at %s: %v", ytdlpPath, err)
-	}
-	if _, err := os.Stat(ffmpegPath); err != nil {
-		return "", "", fmt.Errorf("ffmpeg binary not found at %s: %v", ffmpegPath, err)
+	// Fall back to the project root's bin/ directory for development mode
+	var baseDir string
+	if execPath, err := os.Executable(); err == nil {
+		// Navigate up to the project root (assuming executable is in project root during dev)
+		baseDir = filepath.Dir(filepath.Dir(filepath.Dir(execPath)))
+	} else {
+		// Fallback to current working directory (less reliable)
+		baseDir, err = os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("failed to get working directory: %v", err)
+		}
 	}
 
-	log.Printf("Using development binaries: yt-dlp=%s, ffmpeg=%s", ytdlpPath, ffmpegPath)
-	return ytdlpPath, ffmpegPath, nil
+	var binaryName string
+	switch runtime.GOOS {
+	case "darwin":
+		binaryName = "yt-dlp_macos"
+	case "linux":
+		binaryName = "yt-dlp_linux"
+	case "windows":
+		binaryName = "yt-dlp.exe"
+	default:
+		return "", fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	binaryPath := filepath.Join(baseDir, "bin", binaryName)
+	if _, err := os.Stat(binaryPath); err != nil {
+		return "", fmt.Errorf("yt-dlp binary not found at %s: %v", binaryPath, err)
+	}
+
+	return binaryPath, nil
 }
 
 // RunYTDLPParallel downloads tracks from a playlist URL in parallel.
 func RunYTDLPParallel(
-	playlistURL, downloadDir, playlistName, userFormat string,
+	url, downloadDir, playlistName, userFormat string,
 	updateStatus func(string),
 	updateProgress func(current, total int),
-	updateTracks func([]Track),
+	maxConcurrent int64, // Added: From settings for dynamic concurrency (better for users on different hardware)
+	useCookies bool, // Added: Toggle for Go+ (set via UI settings for premium DJs)
 ) error {
-	ytdlpPath, _, err := getBinaryPaths()
+	ytDlpBinary, err := getYTDLPBinaryPath()
 	if err != nil {
 		updateStatus("Error: Failed to locate yt-dlp binary")
 		log.Printf("Error locating yt-dlp binary: %v", err)
 		return err
 	}
-	log.Printf("Using yt-dlp binary: %s", ytdlpPath)
+	log.Printf("Using yt-dlp binary: %s", ytDlpBinary)
 
 	if userFormat == "" {
 		userFormat = "wav"
 	}
 
 	playlistDir := filepath.Join(downloadDir, playlistName)
-	if err := os.MkdirAll(playlistDir, 0755); err != nil {
-		updateStatus("Error: Failed to create playlist directory")
-		log.Printf("Error creating playlist directory %s: %v", playlistDir, err)
+	log.Printf("Using playlist directory: %s", playlistDir)
+
+	// Extract track URLs with timeout (prevents hang)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, ytDlpBinary, "--flat-playlist", "--no-warnings", "-J", url)
+	if useCookies {
+		cmd.Args = append(cmd.Args, "--cookies-from-browser", "chrome") // Added: For Go+ (assume Chrome; toggle via settings)
+	}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		updateStatus("Error: Failed to extract playlist tracks")
+		log.Printf("Error extracting tracks: %v\nOutput: %s", err, string(output))
 		return err
 	}
+	log.Printf("Extraction output: %s", string(output))
 
-	// Extract track URLs and metadata
-	log.Printf("Attempting to extract tracks from: %s", playlistURL)
-	trackURLs, playlistTitle, tracks, err := extractTrackURLs(ytdlpPath, playlistURL)
+	trackURLs, err := parseURLsFromJSON(string(output))
 	if err != nil {
-		updateStatus(fmt.Sprintf("Error extracting tracks: %v", err))
-		log.Printf("Extraction failed for %s: %v", playlistURL, err)
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			log.Printf("yt-dlp stderr: %s", string(exitErr.Stderr))
-		}
+		updateStatus("Error: Failed to parse playlist tracks")
+		log.Printf("Error parsing tracks: %v", err)
 		return err
 	}
 	if len(trackURLs) == 0 {
 		updateStatus("No tracks found in playlist")
-		log.Printf("No tracks extracted from %s", playlistURL)
+		log.Printf("No tracks found for playlist: %s", url)
 		return fmt.Errorf("no tracks found in playlist")
 	}
-	log.Printf("Extracted %d tracks from playlist titled '%s'", len(trackURLs), playlistTitle)
-	updateTracks(tracks)
+	log.Printf("Found %d tracks in playlist %s", len(trackURLs), playlistName)
 
-	// Auto-fill playlist name if not provided
-	if playlistName == "" {
-		playlistName = playlistTitle
-	}
 	updateStatus("Starting downloads...")
 	updateProgress(0, len(trackURLs))
 
-	// Dynamic concurrency based on CPU cores
-	maxConcurrentDownloads := runtime.NumCPU() * 2
-	if maxConcurrentDownloads < 1 {
-		maxConcurrentDownloads = 1
-	}
-	semaphore := make(chan struct{}, maxConcurrentDownloads)
+	sem := semaphore.NewWeighted(maxConcurrent) // Added: Use settings for concurrency limit (e.g., 4 default)
 	var wg sync.WaitGroup
 	var failedTracks []string
 	var mu sync.Mutex
 
-	for idx, track := range tracks {
+	for idx, url := range trackURLs {
 		wg.Add(1)
-		semaphore <- struct{}{}
-		go func(track Track, trackIdx int) {
+		sem.Acquire(context.Background(), 1) // Limit concurrent downloads
+		go func(trackURL string, trackIdx int) {
 			defer wg.Done()
-			defer func() { <-semaphore }()
+			defer sem.Release(1)
 
-			updateStatus(fmt.Sprintf("Downloading Track %d/%d: %s", trackIdx+1, len(trackURLs), track.Title))
-			log.Printf("Downloading track %d/%d: %s", trackIdx+1, len(trackURLs), track.URL)
+			log.Printf("Downloading track %d/%d: %s", trackIdx+1, len(trackURLs), trackURL)
 
-			err := downloadTrack(ytdlpPath, track.URL, playlistDir, userFormat, func(percent float64) {
-				// Update progress as a percentage for the current track
-				overallProgress := (float64(trackIdx) + (percent / 100.0)) / float64(len(trackURLs)) * 100
-				updateProgress(int(overallProgress*float64(len(trackURLs))/100), len(trackURLs))
-			})
+			err := downloadTrackWithFallback(ytDlpBinary, trackURL, playlistDir, []string{userFormat, "wav", "opus", "mp3"})
 			if err != nil {
 				log.Printf("Error downloading track %d: %s", trackIdx+1, err)
 				mu.Lock()
-				failedTracks = append(failedTracks, fmt.Sprintf("Track %d: %s (Error: %v)", trackIdx+1, track.URL, err))
+				failedTracks = append(failedTracks, fmt.Sprintf("Track %d: %s (Error: %v)", trackIdx+1, trackURL, err))
 				mu.Unlock()
 			}
 
 			updateProgress(trackIdx+1, len(trackURLs))
-		}(track, idx)
+		}(url, idx)
 	}
 
 	wg.Wait()
-	close(semaphore)
-
-	// Removed automatic export to Rekordbox
-	// Now handled manually via the UI button
 
 	// Final status update
 	if len(failedTracks) > 0 {
@@ -191,160 +157,59 @@ func RunYTDLPParallel(
 	return nil
 }
 
-// extractTrackURLs uses yt-dlp to list track URLs and metadata with a timeout.
-func extractTrackURLs(binary, playlistURL string) ([]string, string, []Track, error) {
-	log.Printf("Executing yt-dlp for extraction: %s %s", binary, playlistURL)
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second) // Increased to 60 seconds
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, binary, "--flat-playlist", "--no-warnings", "-J", "--verbose", "--cookies-from-browser", "firefox", playlistURL)
-	cmd.Env = os.Environ() // Inherit parent environment
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("yt-dlp extraction timed out after 60s: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
-		} else {
-			log.Printf("yt-dlp extract failed: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
-		}
-		return nil, "", nil, err
-	}
-	log.Printf("yt-dlp extraction output: %s", outBuf.String())
-
+// parseURLsFromJSON extracts track URLs from JSON output of yt-dlp --flat-playlist.
+func parseURLsFromJSON(jsonStr string) ([]string, error) {
 	type entry struct {
-		URL   string `json:"url"`
-		Title string `json:"title"`
+		URL string `json:"url"`
 	}
 	type playlistData struct {
 		Entries []entry `json:"entries"`
-		Title   string  `json:"title"`
 	}
 
 	var data playlistData
-	if err := json.Unmarshal(outBuf.Bytes(), &data); err != nil {
-		log.Printf("JSON unmarshal error: %v\nOutput: %s", err, outBuf.String())
-		return nil, "", nil, err
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return nil, err
 	}
 
 	var urls []string
-	var tracks []Track
 	for _, e := range data.Entries {
 		if e.URL != "" {
 			urls = append(urls, e.URL)
-			tracks = append(tracks, Track{URL: e.URL, Title: e.Title})
 		}
 	}
-	log.Printf("Extracted %d tracks", len(tracks))
-	return urls, data.Title, tracks, nil
+	return urls, nil
 }
 
-// downloadTrackWithRetry attempts to download a track with retries.
-func downloadTrackWithRetry(binary, url, playlistDir string, formats []string, progressCb func(float64)) error {
-	operation := func() error {
-		return downloadTrack(binary, url, playlistDir, formats[0], progressCb) // Use first format
-	}
-	bo := backoff.NewExponentialBackOff()
-	bo.MaxElapsedTime = 5 * time.Minute
-	return backoff.Retry(operation, bo)
-}
-
-// downloadTrack handles a single track download with detailed logging.
-func downloadTrack(binary, url, playlistDir, format string, progressCb func(float64)) error {
+// downloadTrackWithFallback tries each format until one succeeds.
+func downloadTrackWithFallback(binary, url, playlistDir string, formats []string) error {
 	log.Printf("Starting download for track: %s", url)
-	opts := []string{
-		"-x",
-		"--verbose",
-		"--cookies-from-browser", "firefox",
-		"--audio-format", format,
-		"--audio-quality", "0",
-		"-o", filepath.Join(playlistDir, "%(title)s.%(ext)s"),
-		url,
-	}
+	defer log.Printf("Finished attempt for track: %s", url)
 
-	cmd := exec.Command(binary, opts...)
-	cmd.Env = os.Environ() // Inherit parent environment
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	if err := cmd.Run(); err != nil {
-		log.Printf("yt-dlp download failed: %v\nStdout: %s\nStderr: %s", err, outBuf.String(), errBuf.String())
-		return err
-	}
-	log.Printf("Download output: %s", outBuf.String())
-	progressCb(100.0) // Assume complete for now
-	return nil
-}
+	// Determine the directory containing yt-dlp_macos (Contents/MacOS/bin/)
+	binDir := filepath.Dir(binary)
+	// Use the same directory for ffmpeg-location
+	ffmpegLocation := binDir
 
-// ExportToRekordbox generates a Rekordbox-compatible XML file.
-func ExportToRekordbox(playlistDir, playlistName string) error {
-	tracks, err := os.ReadDir(playlistDir)
-	if err != nil {
-		return fmt.Errorf("failed to read playlist directory: %v", err)
-	}
+	for _, f := range formats {
+		log.Printf("Attempting %s format for track: %s", f, url)
+		opts := []string{
+			"-x",
+			"--audio-format", f,
+			"--audio-quality", "0",
+			"--ffmpeg-location", ffmpegLocation, // Add this to point to ffmpeg/ffprobe
+			"-o", filepath.Join(playlistDir, "%(title)s.%(ext)s"),
+			url,
+		}
 
-	// Filter out non-audio files and collect track paths
-	var audioTracks []string
-	for _, track := range tracks {
-		if track.IsDir() {
+		cmd := exec.Command(binary, opts...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Failed %s for track %s: %v\nOutput: %s", f, url, err, string(output))
 			continue
 		}
-		ext := filepath.Ext(track.Name())
-		if ext == ".wav" || ext == ".mp3" || ext == ".aac" || ext == ".flac" || ext == ".opus" {
-			audioTracks = append(audioTracks, filepath.Join(playlistDir, track.Name()))
-		}
+
+		log.Printf("Track downloaded successfully in %s format: %s", f, url)
+		return nil // Exit on success
 	}
-
-	if len(audioTracks) == 0 {
-		return fmt.Errorf("no audio tracks found in directory: %s", playlistDir)
-	}
-
-	// Generate Rekordbox XML
-	xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
-    <DJ_PLAYLISTS Version="1.0.0">
-        <PRODUCT Name="rekordbox" Version="6.0.0" Company="Pioneer DJ"/>
-        <COLLECTION Entries="` + fmt.Sprintf("%d", len(audioTracks)) + `">
-    `
-
-	for i, trackPath := range audioTracks {
-		trackName := filepath.Base(trackPath)
-		trackName = trackName[:len(trackName)-len(filepath.Ext(trackName))] // Remove extension
-		// Rekordbox expects the Location to be a file:// URI with absolute path
-		absPath, err := filepath.Abs(trackPath)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for track %s: %v", trackPath, err)
-		}
-		location := "file://localhost" + absPath
-		if runtime.GOOS == "windows" {
-			location = "file://localhost/" + strings.ReplaceAll(absPath, `\`, `/`)
-		}
-		xmlContent += fmt.Sprintf(
-			`<TRACK TrackID="%d" Name="%s" Location="%s"/>`,
-			i+1, trackName, location,
-		)
-	}
-
-	xmlContent += `
-        </COLLECTION>
-        <PLAYLISTS>
-            <NODE Type="0" Name="ROOT" Count="1">
-                <NODE Type="1" Name="` + playlistName + `" Count="` + fmt.Sprintf("%d", len(audioTracks)) + `">
-    `
-
-	for i := range audioTracks {
-		xmlContent += fmt.Sprintf(`<TRACK Key="%d"/>`, i+1)
-	}
-
-	xmlContent += `
-                </NODE>
-            </NODE>
-        </PLAYLISTS>
-    </DJ_PLAYLISTS>`
-
-	xmlPath := filepath.Join(playlistDir, playlistName+".xml")
-	if err := os.WriteFile(xmlPath, []byte(xmlContent), 0644); err != nil {
-		return fmt.Errorf("failed to write Rekordbox XML: %v", err)
-	}
-
-	return nil
+	return fmt.Errorf("all format attempts failed for track: %s", url)
 }

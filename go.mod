@@ -5,8 +5,8 @@ go 1.22.0
 toolchain go1.23.0
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/wailsapp/wails/v2 v2.10.1
+	golang.org/x/sync v0.11.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
