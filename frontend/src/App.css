@@ -23,7 +23,7 @@ body {
     text-align: center;
 }
 
-/* Add this for theme switching support */
+/* Theme switching support */
 .neon-theme {
     --bg-primary: #0A0F1E;
     --bg-secondary: #1A2338;
@@ -46,7 +46,7 @@ body {
     --text-secondary: #E2E8F0;
 }
 
-/* Apply vars to classes */
+/* Apply theme variables to classes */
 .bg-club-gradient {
     background: linear-gradient(to bottom, var(--bg-primary), var(--bg-secondary));
 }
@@ -161,4 +161,23 @@ body {
 
 .text-text-secondary {
     color: var(--text-secondary);
+}
+
+/* Custom scrollbar for track list */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-purple);
 }

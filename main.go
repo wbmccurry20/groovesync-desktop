@@ -1,13 +1,16 @@
+// groovesync/main.go
 package main
 
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"groovesync/internal/downloader"
 	"groovesync/internal/logging"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -63,7 +66,7 @@ type DownloadJob struct {
 	OutputPath string  `json:"outputPath"`
 	CreatedAt  string  `json:"createdAt"`
 	Error      string  `json:"error,omitempty"`
-	Type       string  `json:"type"` // "single", "playlist", "batch"
+	Type       string  `json:"type"`
 }
 
 type AppSettings struct {
@@ -109,12 +112,12 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) StartDownload(url, name, format, dir string) error {
-	// Fixed log: Handle empty dir for complete output (shows "(default)" if empty)
 	logDir := dir
 	if dir == "" {
 		logDir = "(default)"
 	}
 	log.Printf("Starting download: URL=%s, Name=%s, Format=%s, Dir=%s", url, name, format, logDir)
+
 	if !a.ValidateURL(url) {
 		err := fmt.Errorf("invalid URL: %s", url)
 		log.Printf("Validation failed: %v", err)
@@ -122,7 +125,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 	}
 	if !contains(a.GetSupportedFormats(), format) {
 		err := fmt.Errorf("unsupported format: %s", format)
-		log.Printf("Validation failed: %v", format)
+		log.Printf("Validation failed: %v", err)
 		return err
 	}
 	if dir == "" {
@@ -134,12 +137,71 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 		return err
 	}
 
+	// Fetch playlist metadata using yt-dlp
+	ytDlpPath, err := downloader.GetYTDLPBinaryPath()
+	if err != nil {
+		log.Printf("Failed to locate yt-dlp binary: %v", err)
+		return err
+	}
+	cmdArgs := []string{"--flat-playlist", "--no-warnings", "-J", url}
+	cookiesPath := filepath.Join(os.Getenv("HOME"), "cookies.txt")
+	if _, err := os.Stat(cookiesPath); err == nil {
+		cmdArgs = append([]string{"--cookies", cookiesPath}, cmdArgs...)
+		log.Printf("Using cookies file: %s", cookiesPath)
+	}
+	cmd := exec.Command(ytDlpPath, cmdArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("Failed to fetch playlist metadata: %v\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to fetch playlist: %v, output: %s", err, string(output))
+	}
+
+	// Log the raw yt-dlp output for debugging
+	log.Printf("yt-dlp raw output: %s", string(output))
+
+	// Parse JSON output into tracks (fix: title optional, fallback to ID)
+	type entry struct {
+		ID    string `json:"id"`
+		URL   string `json:"url"`
+		Title string `json:"title"`
+	}
+	type playlistData struct {
+		Entries []entry `json:"entries"`
+	}
+	var data playlistData
+	if err := json.Unmarshal(output, &data); err != nil {
+		log.Printf("Failed to parse playlist JSON: %v", err)
+		return fmt.Errorf("failed to parse playlist JSON: %v", err)
+	}
+
+	var tracks []Track
+	for _, e := range data.Entries {
+		if e.URL != "" {
+			title := e.Title
+			if title == "" {
+				title = "Track " + e.ID
+			}
+			tracks = append(tracks, Track{URL: e.URL, Title: title})
+		}
+	}
+
+	log.Printf("Emitting %d tracks to frontend", len(tracks))
+	runtime.EventsEmit(a.ctx, "tracks", tracks)
+
+	// Create output directory for playlist
+	outputDir := filepath.Join(dir, name)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		log.Printf("Failed to create output directory %s: %v", outputDir, err)
+		return err
+	}
+
 	// Create a download job
-	jobID := a.CreateDownloadJob(url, name, format, dir, "single")
+	jobID := a.CreateDownloadJob(url, name, format, outputDir, "playlist")
 	log.Printf("Created download job ID: %s", jobID)
 
 	// Run the download in a goroutine with panic recovery
 	go func() {
+		log.Printf("Goroutine started for job %s", jobID) // Log goroutine start
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("Panic in download goroutine for job %s: %v", jobID, r)
@@ -166,8 +228,10 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 		runtime.EventsEmit(a.ctx, "downloadUpdated", job)
 
 		err := downloader.RunYTDLPParallel(
-			url, dir, name, format,
-			int64(a.settings.MaxConcurrent),
+			url,
+			dir,
+			name,
+			format,
 			func(status string) {
 				a.mu.Lock()
 				job.Status = status
@@ -183,10 +247,6 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 				a.mu.Unlock()
 				log.Printf("Progress update for job %s: %d/%d (%.2f%%)", jobID, current, total, job.Progress)
 				runtime.EventsEmit(a.ctx, "downloadUpdated", job)
-			},
-			func(tracks []downloader.Track) {
-				log.Printf("Tracks received for job %s: %d tracks", jobID, len(tracks))
-				runtime.EventsEmit(a.ctx, "tracks", tracks)
 			},
 		)
 
@@ -228,15 +288,18 @@ func (a *App) ExportToRekordbox(playlistName string) error {
 	}
 
 	if latestJob == nil {
+		log.Printf("No completed download found for playlist: %s", playlistName)
 		return fmt.Errorf("no completed download found for playlist: %s", playlistName)
 	}
 
-	playlistDir := filepath.Join(latestJob.OutputPath, playlistName)
-	if err := downloader.ExportToRekordbox(playlistDir, playlistName); err != nil {
+	playlistDir := latestJob.OutputPath
+	if err := downloader.ExportToRekordbox(playlistDir, playlistName, latestJob.Format); err != nil {
+		log.Printf("Failed to export to Rekordbox for %s: %v", playlistName, err)
 		return fmt.Errorf("failed to export to Rekordbox: %w", err)
 	}
 
 	exportPath := filepath.Join(playlistDir, playlistName+".xml")
+	log.Printf("Export completed for %s: %s", playlistName, exportPath)
 	runtime.EventsEmit(a.ctx, "exportCompleted", map[string]string{"path": exportPath})
 	return nil
 }
@@ -271,10 +334,12 @@ func (a *App) CancelDownload(id string) error {
 
 	if job, exists := a.downloads[id]; exists {
 		job.Status = "cancelled"
+		log.Printf("Cancelled download job %s", id)
 		runtime.EventsEmit(a.ctx, "downloadCancelled", id)
 		runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 		return nil
 	}
+	log.Printf("Failed to cancel download: job %s not found", id)
 	return fmt.Errorf("download not found")
 }
 
@@ -303,6 +368,7 @@ func (a *App) UpdateSettings(settings *AppSettings) error {
 	defer a.mu.Unlock()
 
 	a.settings = settings
+	log.Printf("Updated settings: %+v", settings)
 	runtime.EventsEmit(a.ctx, "settingsUpdated", settings)
 	return nil
 }
@@ -325,6 +391,7 @@ func (a *App) CreateDownloadJob(url, title, format, outputPath, jobType string) 
 	}
 
 	a.downloads[id] = job
+	log.Printf("Created download job: %+v", job)
 	runtime.EventsEmit(a.ctx, "downloadCreated", job)
 	runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 	return id
