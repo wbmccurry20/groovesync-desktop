@@ -83,3 +83,5 @@ output/
 # Package files
 *.tgz
 *.tar.gz
+# Test artifacts
+*.wav
