@@ -2,6 +2,7 @@
 package downloader
 
 import (
+	"context"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Track defines a single track, exported for use in main
@@ -197,13 +199,15 @@ func RunYTDLPParallel(
 // extractTrackURLs uses yt-dlp to list track URLs without downloading.
 func extractTrackURLs(playlistURL string) ([]string, error) {
 	log.Printf("Extracting tracks from %s", playlistURL)
-	cmdArgs := []string{"--flat-playlist", "--no-warnings", "-J", playlistURL}
+	cmdArgs := []string{"--flat-playlist", "--no-warnings", "--socket-timeout", "30", "-J", playlistURL}
 	cookiesPath := filepath.Join(os.Getenv("HOME"), "cookies.txt")
 	if _, err := os.Stat(cookiesPath); err == nil {
 		cmdArgs = append([]string{"--cookies", cookiesPath}, cmdArgs...)
 		log.Printf("Using cookies file: %s", cookiesPath)
 	}
-	cmd := exec.Command(ytdlpBinary(), cmdArgs...)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, ytdlpBinary(), cmdArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("yt-dlp error: %v\nOutput: %s", err, string(output))
@@ -252,6 +256,12 @@ func downloadTrackWithFallback(url, playlistDir string, formats []string) error 
 			"-x",
 			"--audio-format", f,
 			"--audio-quality", "0",
+			// Network resilience: never let a stalled connection hang forever.
+			"--socket-timeout", "30",
+			"--retries", "5",
+			"--fragment-retries", "5",
+			"--no-continue",
+			"--no-part",
 			"-o", filepath.Join(playlistDir, "%(title)s.%(ext)s"),
 			url,
 		}
@@ -261,8 +271,17 @@ func downloadTrackWithFallback(url, playlistDir string, formats []string) error 
 		if _, err := os.Stat(cookiesPath); err == nil {
 			cmdArgs = append([]string{"--cookies", cookiesPath}, cmdArgs...)
 		}
-		cmd := exec.Command(ytDLP, cmdArgs...)
+
+		// Hard timeout per attempt so a single hung track cannot freeze the
+		// whole playlist (it holds a concurrency slot until it returns).
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+		cmd := exec.CommandContext(ctx, ytDLP, cmdArgs...)
 		output, err := cmd.CombinedOutput()
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("Timed out after 8m on %s for track %s", f, url)
+			continue
+		}
 		if err != nil {
 			log.Printf("Failed %s for track %s: %v\nOutput: %s", f, url, err, string(output))
 			continue
