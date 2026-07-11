@@ -333,11 +333,16 @@ func (a *App) GetAllDownloads() []*DownloadJob {
 
 func (a *App) CancelDownload(id string) error {
 	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if job, exists := a.downloads[id]; exists {
+	job, exists := a.downloads[id]
+	if exists {
 		job.Status = "cancelled"
 		log.Printf("Cancelled download job %s", id)
+	}
+	// Release before GetDownloadStats() (read lock) to avoid an RWMutex
+	// reentrancy deadlock.
+	a.mu.Unlock()
+
+	if exists {
 		runtime.EventsEmit(a.ctx, "downloadCancelled", id)
 		runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 		return nil
@@ -378,7 +383,6 @@ func (a *App) UpdateSettings(settings *AppSettings) error {
 
 func (a *App) CreateDownloadJob(url, title, format, outputPath, jobType string) string {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 
 	id := fmt.Sprintf("job_%d", time.Now().UnixNano())
 	job := &DownloadJob{
@@ -395,6 +399,11 @@ func (a *App) CreateDownloadJob(url, title, format, outputPath, jobType string) 
 
 	a.downloads[id] = job
 	log.Printf("Created download job: %+v", job)
+	// Release the write lock BEFORE calling GetDownloadStats(), which takes a
+	// read lock. sync.RWMutex is not reentrant, so calling it while holding the
+	// write lock here would deadlock and silently freeze all downloads.
+	a.mu.Unlock()
+
 	runtime.EventsEmit(a.ctx, "downloadCreated", job)
 	runtime.EventsEmit(a.ctx, "downloadStatsUpdated", a.GetDownloadStats())
 	return id
