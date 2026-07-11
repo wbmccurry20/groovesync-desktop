@@ -137,19 +137,20 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 		return err
 	}
 
-	// Fetch playlist metadata using yt-dlp
-	ytDlpPath, err := downloader.GetYTDLPBinaryPath()
+	// Fetch playlist metadata using the bundled yt-dlp binary.
+	ytDLP, err := downloader.GetYTDLPBinaryPath()
 	if err != nil {
 		log.Printf("Failed to locate yt-dlp binary: %v", err)
-		return err
+		return fmt.Errorf("failed to locate yt-dlp binary: %w", err)
 	}
+	log.Printf("Using yt-dlp binary: %s", ytDLP)
 	cmdArgs := []string{"--flat-playlist", "--no-warnings", "-J", url}
 	cookiesPath := filepath.Join(os.Getenv("HOME"), "cookies.txt")
 	if _, err := os.Stat(cookiesPath); err == nil {
 		cmdArgs = append([]string{"--cookies", cookiesPath}, cmdArgs...)
 		log.Printf("Using cookies file: %s", cookiesPath)
 	}
-	cmd := exec.Command(ytDlpPath, cmdArgs...)
+	cmd := exec.Command(ytDLP, cmdArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Failed to fetch playlist metadata: %v\nOutput: %s", err, string(output))
@@ -159,7 +160,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 	// Log the raw yt-dlp output for debugging
 	log.Printf("yt-dlp raw output: %s", string(output))
 
-	// Parse JSON output into tracks (fix: title optional, fallback to ID)
+	// Parse JSON output into tracks (title optional, fallback to ID)
 	type entry struct {
 		ID    string `json:"id"`
 		URL   string `json:"url"`
@@ -201,7 +202,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 
 	// Run the download in a goroutine with panic recovery
 	go func() {
-		log.Printf("Goroutine started for job %s", jobID) // Log goroutine start
+		log.Printf("Goroutine started for job %s", jobID)
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("Panic in download goroutine for job %s: %v", jobID, r)
@@ -227,6 +228,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 		a.mu.Unlock()
 		runtime.EventsEmit(a.ctx, "downloadUpdated", job)
 
+		log.Printf("Calling RunYTDLPParallel for job %s", jobID)
 		err := downloader.RunYTDLPParallel(
 			url,
 			dir,
@@ -249,6 +251,7 @@ func (a *App) StartDownload(url, name, format, dir string) error {
 				runtime.EventsEmit(a.ctx, "downloadUpdated", job)
 			},
 		)
+		log.Printf("RunYTDLPParallel completed for job %s", jobID)
 
 		a.mu.Lock()
 		if err != nil {

@@ -3,11 +3,34 @@
 # Exit on any error
 set -e
 
-# Optional arg for platform (e.g., darwin/arm64, windows/amd64, linux/amd64)
-PLATFORM="${1:-darwin/arm64}"
+# Optional arg for platform (e.g., darwin/arm64, windows/amd64, linux/amd64).
+# When no arg is given, auto-detect the current machine so the app builds for
+# the correct architecture (Apple Silicon vs Intel Mac vs Linux).
+PLATFORM="${1:-}"
+if [ -z "$PLATFORM" ]; then
+    case "$(uname -s)" in
+        Darwin)
+            if [ "$(uname -m)" = "arm64" ]; then
+                PLATFORM="darwin/arm64"
+            else
+                PLATFORM="darwin/amd64"
+            fi
+            ;;
+        Linux)
+            PLATFORM="linux/amd64"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            PLATFORM="windows/amd64"
+            ;;
+        *)
+            PLATFORM="darwin/arm64"
+            ;;
+    esac
+fi
+echo "Building for platform: $PLATFORM"
 
-# Versions (pin for stability)
-YTDLP_VERSION="2025.07.21"
+# Versions (pin ffmpeg for stability; yt-dlp always uses latest because
+# SoundCloud/YouTube frequently break older yt-dlp releases with HTTP 404 errors)
 FFMPEG_VERSION="7.0.2"
 
 # Clean previous artifacts
@@ -89,17 +112,18 @@ cd ..
 # Create bin dir for staging
 mkdir -p bin
 
-# Download yt-dlp (platform-specific)
-echo "Downloading yt-dlp v$YTDLP_VERSION for $PLATFORM..."
+# Download yt-dlp (platform-specific, always latest release). The binary is
+# named per-platform to match GetYTDLPBinaryPath in internal/downloader.
+echo "Downloading latest yt-dlp for $PLATFORM..."
 case "$PLATFORM" in
     darwin/arm64|darwin/amd64)
-        curl -L -o "bin/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp_macos"
+        curl -L -o "bin/yt-dlp_macos" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
         ;;
     windows/amd64)
-        curl -L -o "bin/yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp.exe"
+        curl -L -o "bin/yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
         ;;
     linux/amd64)
-        curl -L -o "bin/yt-dlp" "https://github.com/yt-dlp/yt-dlp/releases/download/$YTDLP_VERSION/yt-dlp_linux"
+        curl -L -o "bin/yt-dlp_linux" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
         ;;
     *)
         echo "Unsupported platform: $PLATFORM"
@@ -149,7 +173,7 @@ mkdir -p dist
 if [[ "$PLATFORM" == *"darwin"* ]]; then
     cp -r build/bin/GrooveSync.app dist/
     mkdir -p dist/GrooveSync.app/Contents/MacOS/bin
-    cp bin/yt-dlp dist/GrooveSync.app/Contents/MacOS/bin/yt-dlp
+    cp bin/yt-dlp_macos dist/GrooveSync.app/Contents/MacOS/bin/yt-dlp_macos
     cp bin/ffmpeg dist/GrooveSync.app/Contents/MacOS/bin/ffmpeg
     cp bin/ffprobe dist/GrooveSync.app/Contents/MacOS/bin/ffprobe
     chmod +x dist/GrooveSync.app/Contents/MacOS/bin/*
@@ -192,7 +216,7 @@ elif [[ "$PLATFORM" == *"windows"* ]]; then
 elif [[ "$PLATFORM" == *"linux"* ]]; then
     cp build/bin/GrooveSync dist/
     mkdir -p dist/bin
-    cp bin/yt-dlp dist/bin/yt-dlp
+    cp bin/yt-dlp_linux dist/bin/yt-dlp_linux
     cp bin/ffmpeg dist/bin/ffmpeg
     cp bin/ffprobe dist/bin/ffprobe
     chmod +x dist/*
