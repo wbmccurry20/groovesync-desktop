@@ -116,7 +116,8 @@ mkdir -p bin
 # named per-platform to match GetYTDLPBinaryPath in internal/downloader.
 echo "Downloading latest yt-dlp for $PLATFORM..."
 case "$PLATFORM" in
-    darwin/arm64|darwin/amd64)
+    darwin/arm64|darwin/amd64|darwin/universal)
+        # yt-dlp_macos is a universal (fat) binary, so it works for arm64, amd64, and universal builds.
         curl -L -o "bin/yt-dlp_macos" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
         ;;
     windows/amd64)
@@ -135,7 +136,7 @@ chmod +x bin/yt-dlp*
 # Download ffmpeg and ffprobe (separate for evermeet)
 echo "Downloading ffmpeg v$FFMPEG_VERSION for $PLATFORM..."
 case "$PLATFORM" in
-    darwin/arm64|darwin/amd64)
+    darwin/arm64|darwin/amd64|darwin/universal)
         curl -L -o "bin/ffmpeg.zip" "https://evermeet.cx/ffmpeg/ffmpeg-$FFMPEG_VERSION.zip"
         unzip -o "bin/ffmpeg.zip" -d "bin/"
         rm "bin/ffmpeg.zip"
