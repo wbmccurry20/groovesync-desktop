@@ -87,6 +87,18 @@ cd frontend
 npm install
 cd ..
 
+# Ensure frontend/dist exists BEFORE any Go command runs. main.go uses
+# //go:embed frontend/dist/* which fails with "no matching files found" on a
+# fresh checkout because the frontend hasn't been built yet. This placeholder
+# satisfies the embed during `go mod tidy` / `wails generate module` and is
+# overwritten by the real `npm run build` output below. Note: Go's embed glob
+# ignores dotfiles, so this must be a real named file (not .keep).
+echo "Seeding frontend/dist placeholder for go:embed..."
+mkdir -p frontend/dist
+if [ ! -f frontend/dist/index.html ]; then
+    echo '<!doctype html><title>GrooveSync</title>' > frontend/dist/index.html
+fi
+
 # Prepare Go modules
 echo "Preparing Go modules..."
 go mod tidy
