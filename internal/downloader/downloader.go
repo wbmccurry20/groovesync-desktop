@@ -173,10 +173,20 @@ func RunYTDLPParallel(
 	wg.Wait()
 	close(semaphore)
 
+	succeeded := len(trackURLs) - len(failedTracks)
 	if len(failedTracks) > 0 {
-		updateStatus(fmt.Sprintf("Downloaded with %d failures. Check logs.", len(failedTracks)))
 		log.Printf("Failed to download the following tracks: %v", failedTracks)
-		return fmt.Errorf("some tracks failed to download")
+		// If nothing downloaded at all, this is a real failure.
+		if succeeded == 0 {
+			updateStatus("All downloads failed. Check logs.")
+			return fmt.Errorf("all %d tracks failed to download", len(trackURLs))
+		}
+		// Partial success: some tracks (commonly SoundCloud DRM/paywalled or
+		// removed tracks) failed, but others downloaded. Treat this as success
+		// so the job completes and the user can still export the good tracks.
+		updateStatus(fmt.Sprintf("Done: %d downloaded, %d skipped (DRM/unavailable). Check logs.", succeeded, len(failedTracks)))
+		log.Printf("Playlist %s finished with partial success: %d ok, %d failed", playlistName, succeeded, len(failedTracks))
+		return nil
 	}
 
 	updateStatus(fmt.Sprintf("All tracks for playlist %s downloaded successfully!", playlistName))
